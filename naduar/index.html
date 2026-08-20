@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ranga Chakua & Chari Pukhuri Neighbor Cluster — Na-Duar Map</title>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <style>
+    :root {
+      color-scheme: dark light;
+      --bg: #0f172a; --panel: #1e293b; --ink: #f8fafc;
+      --muted: #94a3b8; --border: #334155; --accent: #38bdf8;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    
+    .header { height: 56px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 18px; flex-shrink: 0; z-index: 500; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.02rem; color: #f8fafc; text-decoration: none; }
+    .brand-badge { background: #0284c7; color: #fff; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; font-weight: 700; }
+    .nav-actions { display: flex; align-items: center; gap: 10px; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; text-decoration: none; cursor: pointer; border: 1px solid var(--border); transition: all 0.15s; }
+    .btn-primary { background: #0284c7; color: #fff; border-color: #0369a1; }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-secondary { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+    .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+    
+    .layout { flex: 1; display: grid; grid-template-columns: 380px 1fr; min-height: 0; }
+    @media(max-width: 768px) { .layout { display: flex; flex-direction: column; } }
+    
+    .sidebar { background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+    .search-box { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .search-input { width: 100%; padding: 8px 12px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; color: #fff; font: inherit; font-size: 0.85rem; outline: none; }
+    .search-input:focus { border-color: var(--accent); }
+    
+    .village-list { flex: 1; overflow-y: auto; list-style: none; }
+    .village-item { padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
+    .village-item:hover { background: rgba(255,255,255,0.04); }
+    .village-item.active { background: rgba(56, 189, 248, 0.12); border-left: 3.5px solid var(--accent); }
+    .v-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .v-name { font-weight: 700; font-size: 0.9rem; color: #f8fafc; }
+    .v-chip { font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 12px; }
+    .v-meta { font-size: 0.76rem; color: var(--muted); }
+    
+    #map { width: 100%; height: 100%; background: #090d16; }
+    
+    .leaflet-popup-content-wrapper { background: #1e293b; color: #f8fafc; border-radius: 10px; border: 1px solid var(--border); }
+    .leaflet-popup-tip { background: #1e293b; }
+    .pop-title { font-weight: 800; font-size: 1.05rem; color: #38bdf8; margin-bottom: 4px; }
+    .pop-body { font-size: 0.8rem; color: #cbd5e1; line-height: 1.45; }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <a class="brand" href="../assam/">
+    📍 Ranga Chakua & Chari Pukhuri Cluster
+    <span class="brand-badge">Na-Duar, Sonitpur</span>
+  </a>
+  <div class="nav-actions">
+    <a class="btn btn-secondary" href="../assam/">🗺️ Main Assam Portal</a>
+    <a class="btn btn-primary" href="naduar_villages.kml" download="Na_Duar_Sub_District_Villages.kml">📥 Na-Duar KML File</a>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="search-box">
+      <input id="q" class="search-input" type="search" placeholder="Search cluster villages..." autocomplete="off" />
+    </div>
+    <ul class="village-list" id="v-list"></ul>
+  </aside>
+  
+  <main style="position:relative;">
+    <div id="map"></div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="cluster_geojson.js"></script>
+<script>
+  const map = L.map('map', {
+    zoomControl: false,
+    preferCanvas: true,
+    zoomAnimation: false
+  });
+  L.control.zoom({ position: 'topright' }).addTo(map);
+
+  const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20
+  }).addTo(map);
+
+  const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri', maxZoom: 18
+  });
+
+  const osmStd = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap', subdomains: 'abc', maxZoom: 19
+  });
+
+  L.control.layers({
+    "🚀 CARTO Voyager (Default)": cartoVoyager,
+    "🛰️ Esri Satellite": esriSat,
+    "🗺️ OpenStreetMap": osmStd
+  }, null, { position: 'bottomleft' }).addTo(map);
+
+  const layerMap = new Map();
+
+  const geoLayer = L.geoJSON(clusterData, {
+    style: function(feat) {
+      const col = feat.properties.color || '#38bdf8';
+      return { color: col, weight: 3, opacity: 0.95, fillColor: col, fillOpacity: 0.35 };
+    },
+    onEachFeature: function(feat, layer) {
+      const p = feat.properties;
+      const html = '<div class="pop-title">' + p.name + '</div>'
+        + '<div class="pop-body">'
+        + '<b>Sub-District:</b> ' + p.sub + '<br/>'
+        + '<b>District:</b> ' + p.district + '<br/>'
+        + '<b>Boundary Contact:</b> ' + p.contact + '<br/>'
+        + '<b>Village ID:</b> ' + p.id + '<br/>'
+        + '<b>Centroid:</b> ' + p.lat + ', ' + p.lng
+        + '</div>';
+      layer.bindPopup(html);
+      layerMap.set(p.id, layer);
+    }
+  }).addTo(map);
+
+  map.fitBounds(geoLayer.getBounds(), { padding: [40, 40] });
+
+  const vList = document.getElementById('v-list');
+  const qInput = document.getElementById('q');
+
+  function renderList(filterTerm = '') {
+    vList.innerHTML = '';
+    const q = filterTerm.toLowerCase().trim();
+    clusterData.features.forEach(f => {
+      const p = f.properties;
+      if (q && !p.name.toLowerCase().includes(q) && !p.contact.toLowerCase().includes(q)) return;
+      
+      const li = document.createElement('li');
+      li.className = 'village-item';
+      li.dataset.id = p.id;
+      li.innerHTML = '<div class="v-header"><span class="v-name">' + p.name + '</span><span class="v-chip" style="background:' + p.color + '22; color:' + p.color + ';">ID ' + p.id + '</span></div>'
+        + '<div class="v-meta">' + p.contact + '</div>';
+      
+      li.addEventListener('click', () => {
+        document.querySelectorAll('.village-item').forEach(el => el.classList.remove('active'));
+        li.classList.add('active');
+        
+        const layer = layerMap.get(p.id);
+        if (layer) {
+          map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 15, animate: true });
+          layer.openPopup();
+        }
+      });
+      
+      vList.appendChild(li);
+    });
+  }
+
+  qInput.addEventListener('input', e => renderList(e.target.value));
+  renderList();
+</script>
+</body>
+</html>
