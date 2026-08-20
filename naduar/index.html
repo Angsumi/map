@@ -48,6 +48,21 @@
     .leaflet-popup-tip { background: #1e293b; }
     .pop-title { font-weight: 800; font-size: 1.05rem; color: #38bdf8; margin-bottom: 4px; }
     .pop-body { font-size: 0.8rem; color: #cbd5e1; line-height: 1.45; }
+
+    /* Village labels directly on map */
+    .map-village-label {
+      background: rgba(15, 23, 42, 0.88) !important;
+      border: 1px solid rgba(56, 189, 248, 0.7) !important;
+      color: #ffffff !important;
+      font-weight: 800 !important;
+      font-size: 11px !important;
+      padding: 3px 8px !important;
+      border-radius: 6px !important;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.6) !important;
+      white-space: nowrap !important;
+      backdrop-filter: blur(4px) !important;
+    }
+    .map-village-label::before { display: none !important; }
   </style>
 </head>
 <body>
@@ -86,12 +101,13 @@
   });
   L.control.zoom({ position: 'topright' }).addTo(map);
 
-  const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20
+  // DEFAULT BASE LAYER: ESRI SATELLITE
+  const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics', maxZoom: 18
   }).addTo(map);
 
-  const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri', maxZoom: 18
+  const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20
   });
 
   const osmStd = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -99,9 +115,9 @@
   });
 
   L.control.layers({
-    "🚀 CARTO Voyager (Default)": cartoVoyager,
-    "🛰️ Esri Satellite": esriSat,
-    "🗺️ OpenStreetMap": osmStd
+    "🛰️ Esri Satellite (Default)": esriSat,
+    "🚀 CARTO Voyager": cartoVoyager,
+    "🗺️ OpenStreetMap Standard": osmStd
   }, null, { position: 'bottomleft' }).addTo(map);
 
   const layerMap = new Map();
@@ -122,6 +138,14 @@
         + '<b>Centroid:</b> ' + p.lat + ', ' + p.lng
         + '</div>';
       layer.bindPopup(html);
+      
+      // PERMANENT TEXT LABELS DIRECTLY ON MAP
+      layer.bindTooltip(p.name, {
+        permanent: true,
+        direction: 'center',
+        className: 'map-village-label'
+      });
+      
       layerMap.set(p.id, layer);
     }
   }).addTo(map);
