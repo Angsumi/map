@@ -225,38 +225,57 @@
 <script>
 /* ============================================================
    Assam Map Portal
-   Map is clean on load. Clicking a village → single pin.
-   Clicking a district → that district's boundary only.
+   High performance rendering with OpenStreetMap view options.
    =========================================================== */
 
-// MAP
-const map = L.map('map', {zoomControl:false, scrollWheelZoom:true});
+// LEAFLET MAP (preferCanvas for ultra-fast rendering)
+const map = L.map('map', {
+  zoomControl: false,
+  scrollWheelZoom: true,
+  preferCanvas: true,
+  fadeAnimation: false,
+  zoomAnimation: true
+});
 L.control.zoom({position:'topright'}).addTo(map);
 
-// Fast, reliable, high performance CARTO Voyager tile layer (no rate blocks)
-const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  subdomains: 'abcd',
+// OPENSTREETMAP TILE LAYERS & VIEW OPTIONS
+const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   maxZoom: 19
 });
 
-const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+const osmHot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by <a href="https://www.hotosm.org/">HOT</a>',
+  subdomains: 'abc',
+  maxZoom: 19
+});
+
+const osmCyclOSM = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://www.cyclosm.org">CyclOSM</a>',
+  subdomains: 'abc',
+  maxZoom: 18
+});
+
+const osmTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+  subdomains: 'abc',
+  maxZoom: 17
+});
+
+const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
   maxZoom: 18
 });
 
-const lightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  subdomains: 'abcd',
-  maxZoom: 19
-});
-
-streetLayer.addTo(map);
+// Default layer: OpenStreetMap Standard
+osmStandard.addTo(map);
 
 L.control.layers({
-  "Street Map": streetLayer,
-  "Satellite": satelliteLayer,
-  "Light": lightLayer
+  "🗺️ OpenStreetMap": osmStandard,
+  "🏥 OSM Humanitarian": osmHot,
+  "🚲 OSM CyclOSM": osmCyclOSM,
+  "⛰️ OSM Topo": osmTopo,
+  "🛰️ Satellite": esriSatellite
 }, null, { position: 'bottomleft' }).addTo(map);
 
 map.setView([26.2, 92.9], 7);
@@ -267,6 +286,8 @@ const dStyle = {color:'#0a4f34', weight:2.5, fillColor:'#3db87a', fillOpacity:.5
 let currentTab       = 'v';
 let districtData     = [];   // [{name, geojson, bounds}]
 let villageData      = [];   // [{name, sub, district, lat, lng}]
+let filteredVillages = [];   // Filtered array for rendering
+let villageDisplayCount = 80; // Virtual scroll batch limit
 let mobilePanelShown = 'list';
 let activeVMarker    = null; // single village pin
 let activeDLayer     = null; // single district boundary
@@ -379,26 +400,58 @@ clearBtn.addEventListener('click',()=>{
   searchInput.focus();
 });
 
-// FILTER
-function filterVillages(term){
-  const q=term.toLowerCase().trim(); let shown=0;
-  villageList.querySelectorAll('li[data-index]').forEach((li,i)=>{
-    const item=villageData[i];
-    if(!item){li.hidden=true;return;}
-    const match=!q||item.name.toLowerCase().includes(q)||item.sub.toLowerCase().includes(q)||item.district.toLowerCase().includes(q);
-    li.hidden=!match; if(match) shown++;
-  });
-  const total=villageData.length;
-  vCount.textContent=q?shown.toLocaleString():total.toLocaleString();
-  searchCount.textContent=q?shown.toLocaleString()+' / '+total.toLocaleString():'';
-  if(total>0){
-    const old=villageList.querySelector('.empty-state'); if(old) old.remove();
-    const noRes=villageList.querySelector('.no-results');
-    if(shown===0&&q){
-      if(!noRes){const li=document.createElement('li');li.className='no-results empty-state';li.innerHTML='<div class="big">🔍</div><p>No results for "<strong>'+esc(q)+'</strong>"</p>';villageList.appendChild(li);}
-    } else {if(noRes) noRes.remove();}
+// ULTRA-FAST VIRTUAL CHUNKED RENDER FOR 21,032 VILLAGES
+function renderVillageBatch(){
+  const batch = filteredVillages.slice(0, villageDisplayCount);
+  villageList.innerHTML = '';
+  if(batch.length === 0 && villageData.length > 0){
+    const li=document.createElement('li');
+    li.className='no-results empty-state';
+    li.innerHTML='<div class="big">🔍</div><p>No results for "<strong>'+esc(searchInput.value)+'</strong>"</p>';
+    villageList.appendChild(li);
+    return;
   }
+
+  const frag = document.createDocumentFragment();
+  batch.forEach(item => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.className = 'list-item-btn v-item';
+    btn.innerHTML = '<span class="dot"></span><span class="item-text"><span class="item-name">'+esc(item.name)+'</span><span class="item-meta">'+esc([item.sub,item.district].filter(Boolean).join(' · '))+'</span></span>';
+    btn.addEventListener('click', () => showVillage(item, btn));
+    li.appendChild(btn);
+    frag.appendChild(li);
+  });
+  villageList.appendChild(frag);
 }
+
+// LAZY SCROLLING TO LOAD MORE VILLAGES AS YOU SCROLL
+panelV.addEventListener('scroll', () => {
+  if (panelV.scrollTop + panelV.clientHeight >= panelV.scrollHeight - 120) {
+    if (villageDisplayCount < filteredVillages.length) {
+      villageDisplayCount += 60;
+      renderVillageBatch();
+    }
+  }
+});
+
+function filterVillages(term){
+  const q = term.toLowerCase().trim();
+  if(!q){
+    filteredVillages = villageData;
+  } else {
+    filteredVillages = villageData.filter(item =>
+      item.name.toLowerCase().includes(q) ||
+      item.sub.toLowerCase().includes(q) ||
+      item.district.toLowerCase().includes(q)
+    );
+  }
+  villageDisplayCount = 80;
+  vCount.textContent = q ? filteredVillages.length.toLocaleString() : villageData.length.toLocaleString();
+  searchCount.textContent = q ? filteredVillages.length.toLocaleString()+' / '+villageData.length.toLocaleString() : '';
+  renderVillageBatch();
+}
+
 function filterDistricts(term){
   const q=term.toLowerCase().trim(); let shown=0;
   districtList.querySelectorAll('li').forEach(li=>{
@@ -410,19 +463,6 @@ function filterDistricts(term){
   searchCount.textContent=q?shown+' / '+total:'';
 }
 
-// BUILD LISTS
-function buildVillageList(){
-  villageList.innerHTML='';
-  const frag=document.createDocumentFragment();
-  villageData.forEach((item,i)=>{
-    const li=document.createElement('li'); li.dataset.index=i;
-    const btn=document.createElement('button'); btn.className='list-item-btn v-item';
-    btn.innerHTML='<span class="dot"></span><span class="item-text"><span class="item-name">'+esc(item.name)+'</span><span class="item-meta">'+esc([item.sub,item.district].filter(Boolean).join(' · '))+'</span></span>';
-    btn.addEventListener('click',()=>showVillage(item,btn));
-    li.appendChild(btn); frag.appendChild(li);
-  });
-  villageList.appendChild(frag);
-}
 function buildDistrictList(){
   districtList.innerHTML='';
   const frag=document.createDocumentFragment();
@@ -441,7 +481,8 @@ function buildDistrictList(){
 function showVillage(item,btn){
   clearMap();
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
-  btn.classList.add('highlighted');
+  if(btn) btn.classList.add('highlighted');
+
   activeVMarker=L.circleMarker([item.lat,item.lng],{
     radius:9,color:'#8a2800',weight:2.5,fillColor:'#e85010',fillOpacity:.95
   }).addTo(map);
@@ -454,14 +495,15 @@ function showVillage(item,btn){
   setTimeout(()=>{
     map.setView([item.lat,item.lng],14,{animate:true});
     if(activeVMarker) activeVMarker.openPopup();
-  }, 150);
+  }, 120);
 }
 
 // SHOW DISTRICT — one boundary polygon, clean map
 function showDistrict(item,btn){
   clearMap();
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
-  btn.classList.add('highlighted');
+  if(btn) btn.classList.add('highlighted');
+
   activeDLayer=L.geoJSON(item.geojson,{style:dStyle}).addTo(map);
   activeDLayer.bindPopup(popDistrict(item.name),{maxWidth:220});
   
@@ -472,7 +514,7 @@ function showDistrict(item,btn){
   setTimeout(()=>{
     map.fitBounds(item.bounds,{padding:[40,40],maxZoom:11});
     if(activeDLayer) activeDLayer.openPopup();
-  }, 150);
+  }, 120);
 }
 
 // LOAD DATA WITH FALLBACKS
@@ -501,7 +543,6 @@ function loadVillages(){
     .then(rows=>{
       rows.forEach(([name,sub,district,lat,lng])=>villageData.push({name,sub,district,lat,lng}));
       villageData.sort((a,b)=>a.name.localeCompare(b.name));
-      buildVillageList();
       vCount.textContent=villageData.length.toLocaleString();
       setStatus(villageData.length.toLocaleString()+' villages ready',true);
       filterVillages('');
