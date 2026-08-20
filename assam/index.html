@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Assam Village & District Portal — search and explore all 35 districts and 21,032 villages of Assam on an interactive map." />
+  <title>Assam Map Portal — Villages & Districts</title>
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIINfQ0kPjS8KQ2H5nQf1LL2jW9a7q1zv7M=" crossorigin="" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg:       #f2f5f0;
+      --panel:    #ffffff;
+      --ink:      #111c17;
+      --muted:    #4f6358;
+      --border:   #d0dbd1;
+      --accent:   #126a4a;
+      --accent2:  #0b9960;
+      --soft:     #d8eee2;
+      --shadow:   0 4px 24px rgba(18,106,74,.10);
+      --radius:   14px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:     #0f1a13;
+        --panel:  #182318;
+        --ink:    #e8f5eb;
+        --muted:  #8ab49a;
+        --border: #2a3e30;
+        --accent: #4fc98a;
+        --accent2:#34a86a;
+        --soft:   #1c3626;
+        --shadow: 0 4px 24px rgba(0,0,0,.35);
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; line-height:1.5; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+    /* topbar */
+    .topbar { background:var(--panel); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:1000; box-shadow:0 1px 8px rgba(0,0,0,.07); }
+    .topbar-inner { max-width:1300px; margin:auto; padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; }
+    .brand { display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--ink); font-weight:800; font-size:1.05rem; letter-spacing:-.03em; }
+    .brand-icon { width:32px; height:32px; border-radius:9px; background:var(--accent); display:grid; place-items:center; }
+    .topbar-links { display:flex; gap:20px; font-size:.88rem; color:var(--muted); }
+    .topbar-links a { text-decoration:none; color:inherit; transition:color .15s; }
+    .topbar-links a:hover { color:var(--accent); }
+
+    /* hero */
+    .hero { max-width:1300px; margin:0 auto; padding:56px 24px 40px; text-align:center; }
+    .hero-badge { display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin-bottom:16px; }
+    .hero h1 { margin:0 0 16px; font-size:clamp(2rem,5vw,3.5rem); font-weight:900; letter-spacing:-.05em; line-height:1; }
+    .hero p { max-width:560px; margin:0 auto 36px; color:var(--muted); font-size:1.05rem; }
+    .hero-buttons { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-bottom:32px; }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:13px 26px; border-radius:var(--radius); font-size:.97rem; font-weight:700; cursor:pointer; border:none; text-decoration:none; transition:transform .18s, box-shadow .18s; }
+    .btn:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+    .btn:active { transform:translateY(0); }
+    .btn-primary { background:var(--accent); color:#fff; }
+    .btn-primary:hover { background:var(--accent2); }
+    .btn-secondary { background:var(--panel); color:var(--ink); border:1.5px solid var(--border); }
+
+    /* stats */
+    .stats { display:flex; justify-content:center; max-width:400px; margin:0 auto 48px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--panel); }
+    .stat { flex:1; padding:14px 16px; text-align:center; border-right:1px solid var(--border); }
+    .stat:last-child { border-right:none; }
+    .stat strong { display:block; font-size:1.4rem; font-weight:800; color:var(--accent); }
+    .stat span { font-size:.78rem; color:var(--muted); }
+
+    /* portal layout */
+    #portal { max-width:1300px; margin:0 auto; padding:0 24px 64px; }
+    .portal-grid { display:grid; grid-template-columns:1fr 340px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); background:var(--panel); min-height:640px; }
+    @media (max-width:860px) { .portal-grid { grid-template-columns:1fr; } }
+
+    /* map */
+    #map { min-height:640px; background:#e4ece6; }
+
+    /* sidebar */
+    .sidebar { border-left:1px solid var(--border); display:flex; flex-direction:column; max-height:640px; overflow:hidden; }
+    @media (max-width:860px) { .sidebar { max-height:420px; border-left:none; border-top:1px solid var(--border); } }
+
+    /* tabs */
+    .tab-bar { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .tab-btn { flex:1; padding:14px 10px; font:inherit; font-size:.88rem; font-weight:700; background:transparent; border:none; color:var(--muted); cursor:pointer; border-bottom:2.5px solid transparent; transition:color .15s, border-color .15s; }
+    .tab-btn.active { color:var(--accent); border-color:var(--accent); }
+    .tab-btn:hover:not(.active) { color:var(--ink); }
+
+    /* search */
+    .search-box { padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .search-box input { width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--ink); font:inherit; font-size:.88rem; outline:none; transition:border-color .15s, box-shadow .15s; }
+    .search-box input:focus { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+    .search-count { margin-top:6px; font-size:.76rem; color:var(--muted); }
+
+    /* lists */
+    .list-panel { flex:1; overflow-y:auto; display:none; }
+    .list-panel.active { display:block; }
+    .list-panel ul { margin:0; padding:0; list-style:none; }
+    .list-panel li button { display:block; width:100%; text-align:left; padding:10px 14px; background:none; border:none; border-bottom:1px solid var(--border); font:inherit; font-size:.85rem; color:var(--ink); cursor:pointer; transition:background .13s; line-height:1.35; }
+    .list-panel li button:hover { background:var(--soft); }
+    .list-panel li button.highlighted { background:var(--soft); color:var(--accent); }
+    .item-name { font-weight:700; display:block; }
+    .item-meta { font-size:.76rem; color:var(--muted); }
+
+    /* status */
+    .sidebar-status { padding:10px 14px; font-size:.78rem; color:var(--muted); border-top:1px solid var(--border); flex-shrink:0; }
+    .loading-bar { height:3px; background:var(--soft); border-radius:2px; overflow:hidden; margin:6px 0 0; }
+    .loading-bar-fill { height:100%; background:var(--accent); animation:indeterminate 1.5s infinite; }
+    @keyframes indeterminate { 0%{width:0;margin-left:0} 50%{width:60%;margin-left:20%} 100%{width:0;margin-left:100%} }
+    .loading-bar.done .loading-bar-fill { animation:none; width:100%; }
+
+    /* popup */
+    .pop-name { font-weight:800; font-size:.97rem; margin:0 0 4px; }
+    .pop-meta { color:#526359; margin:0 0 8px; font-size:.82rem; }
+    .pop-actions { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+    .pop-link { display:inline-flex; align-items:center; gap:4px; font-size:.78rem; font-weight:700; padding:5px 9px; border-radius:6px; text-decoration:none; background:#d8eee2; color:#126a4a; transition:background .15s; }
+    .pop-link:hover { background:#b8decc; }
+
+    footer { text-align:center; padding:28px 24px; font-size:.82rem; color:var(--muted); border-top:1px solid var(--border); }
+    .list-panel::-webkit-scrollbar { width:5px; }
+    .list-panel::-webkit-scrollbar-track { background:transparent; }
+    .list-panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:9px; }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; animation:none!important; scroll-behavior:auto!important; } }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#">
+      <span class="brand-icon">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+          <circle cx="12" cy="9" r="2.5" fill="white" stroke="none"/>
+        </svg>
+      </span>
+      Assam Map Portal
+    </a>
+    <div class="topbar-links">
+      <a href="#portal">Explore</a>
+      <a href="https://github.com/Angsumi/map" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </div>
+</div>
+
+<section class="hero" id="top">
+  <p class="hero-badge">Geographic Reference &middot; Assam, India</p>
+  <h1>Explore Every Village &amp; District</h1>
+  <p>Search, locate and navigate all 35 districts and 21,032 villages of Assam on a live interactive map.</p>
+  <div class="hero-buttons">
+    <a class="btn btn-primary" href="#portal" id="hero-villages">&#127968; Browse Villages</a>
+    <a class="btn btn-secondary" href="#portal" id="hero-districts">&#128506; Browse Districts</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><strong>35</strong><span>Districts</span></div>
+    <div class="stat"><strong>21,032</strong><span>Villages</span></div>
+    <div class="stat"><strong>33</strong><span>Sub-districts</span></div>
+  </div>
+</section>
+
+<section id="portal">
+  <div class="portal-grid">
+    <div id="map" aria-label="Interactive map of Assam"></div>
+    <aside class="sidebar" aria-label="Search panel">
+      <div class="tab-bar" role="tablist">
+        <button class="tab-btn active" id="tab-villages" role="tab" aria-selected="true" aria-controls="panel-villages">&#127968; Villages</button>
+        <button class="tab-btn" id="tab-districts" role="tab" aria-selected="false" aria-controls="panel-districts">&#128506; Districts</button>
+      </div>
+      <div class="search-box">
+        <label class="sr-only" for="search-input">Search</label>
+        <input id="search-input" type="search" placeholder="Search villages..." autocomplete="off" spellcheck="false" />
+        <div class="search-count" id="search-count" aria-live="polite"></div>
+      </div>
+      <div class="list-panel active" id="panel-villages" role="tabpanel" aria-labelledby="tab-villages">
+        <ul id="village-list" aria-label="Village list">
+          <li><button disabled style="color:var(--muted);cursor:default;pointer-events:none;">Loading villages...</button></li>
+        </ul>
+      </div>
+      <div class="list-panel" id="panel-districts" role="tabpanel" aria-labelledby="tab-districts">
+        <ul id="district-list" aria-label="District list"></ul>
+      </div>
+      <div class="sidebar-status" id="sidebar-status" aria-live="polite">
+        <span id="status-text">Initialising...</span>
+        <div class="loading-bar" id="loading-bar"><div class="loading-bar-fill"></div></div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<footer>
+  Data from Assam district and village boundary datasets &middot;
+  Map tiles &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors &middot;
+  Built with <a href="https://leafletjs.com" target="_blank" rel="noreferrer">Leaflet</a>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const BASE = '../';
+
+// Map init
+const map = L.map('map', { zoomControl:false, scrollWheelZoom:false });
+L.control.zoom({ position:'bottomright' }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom:19,
+}).addTo(map);
+map.setView([26.2, 92.9], 7);
+
+// Styles
+const dStyle   = { color:'#1a6b4a', weight:1.5, fillColor:'#7ecba0', fillOpacity:.55 };
+const dHiStyle = { color:'#0a4f34', weight:2.5, fillColor:'#3db87a', fillOpacity:.80 };
+const vStyle   = { color:'#b04000', weight:.8, fillColor:'#f07030', fillOpacity:.85, radius:4 };
+const vHiStyle = { color:'#7c2800', weight:1.5, fillColor:'#ffc060', fillOpacity:1, radius:7 };
+const vRenderer = L.canvas({ padding:.5 });
+
+// State
+let districtData = [];
+let villageData  = [];
+let activeDistName = null;
+let activeVLayer   = null;
+let currentTab   = 'villages';
+
+// DOM
+const searchInput  = document.getElementById('search-input');
+const searchCount  = document.getElementById('search-count');
+const villageList  = document.getElementById('village-list');
+const districtList = document.getElementById('district-list');
+const statusText   = document.getElementById('status-text');
+const loadingBar   = document.getElementById('loading-bar');
+
+// Tab switch
+function switchTab(tab) {
+  currentTab = tab;
+  const iv = tab === 'villages';
+  document.getElementById('tab-villages').classList.toggle('active', iv);
+  document.getElementById('tab-districts').classList.toggle('active', !iv);
+  document.getElementById('tab-villages').setAttribute('aria-selected', iv);
+  document.getElementById('tab-districts').setAttribute('aria-selected', !iv);
+  document.getElementById('panel-villages').classList.toggle('active', iv);
+  document.getElementById('panel-districts').classList.toggle('active', !iv);
+  searchInput.placeholder = iv ? 'Search villages...' : 'Search districts...';
+  searchInput.value = '';
+  if (iv) renderVillageList(''); else renderDistrictList('');
+}
+document.getElementById('tab-villages').addEventListener('click', () => switchTab('villages'));
+document.getElementById('tab-districts').addEventListener('click', () => switchTab('districts'));
+document.getElementById('hero-villages').addEventListener('click', () => setTimeout(() => switchTab('villages'), 100));
+document.getElementById('hero-districts').addEventListener('click', () => setTimeout(() => switchTab('districts'), 100));
+
+// Helpers
+function esc(s) { return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function gmVillage(lat,lng) { return 'https://www.google.com/maps?q='+lat+','+lng+'&z=14'; }
+function gmDistrict(name)   { return 'https://www.google.com/maps/search/'+encodeURIComponent(name+' district Assam India'); }
+function osmUrl(lat,lng)    { return 'https://www.openstreetmap.org/?mlat='+lat+'&mlon='+lng+'&zoom=14'; }
+
+function villagePopup(p, lat, lng) {
+  const name = p.VILNAME11 || p.VILNAM_SOI || 'Unnamed village';
+  const meta = [p.SDTNAME, p.DTNAME].filter(Boolean).join(', ');
+  return '<div><p class="pop-name">'+esc(name)+'</p>'
+    +'<p class="pop-meta">'+esc(meta)+'</p>'
+    +'<div class="pop-actions">'
+    +'<a class="pop-link" href="'+gmVillage(lat,lng)+'" target="_blank" rel="noreferrer">&#128205; Google Maps</a>'
+    +'<a class="pop-link" href="'+osmUrl(lat,lng)+'" target="_blank" rel="noreferrer">&#128506; OpenStreetMap</a>'
+    +'</div></div>';
+}
+
+function districtPopup(name) {
+  return '<div><p class="pop-name">'+esc(name)+'</p>'
+    +'<p class="pop-meta">District &middot; Assam</p>'
+    +'<div class="pop-actions">'
+    +'<a class="pop-link" href="'+gmDistrict(name)+'" target="_blank" rel="noreferrer">&#128205; Google Maps</a>'
+    +'</div></div>';
+}
+
+function setStatus(msg, done) {
+  statusText.textContent = msg;
+  if (done) loadingBar.classList.add('done');
+}
+
+// Load Districts
+function loadDistricts() {
+  setStatus('Loading district boundaries...');
+  fetch(BASE + 'NEW_Assam_districts.geojson')
+    .then(r => { if (!r.ok) throw new Error('District data failed.'); return r.json(); })
+    .then(data => {
+      L.geoJSON(data, {
+        style: dStyle,
+        onEachFeature(feature, layer) {
+          const name = feature.properties.name;
+          layer.bindPopup(districtPopup(name), { maxWidth:240 });
+          layer.on({
+            mouseover() { if (activeDistName !== name) layer.setStyle(dHiStyle); },
+            mouseout()  { if (activeDistName !== name) layer.setStyle(dStyle); },
+            click()     { selectDistrict(name, true); },
+          });
+          districtData.push({ name, layer, bounds: layer.getBounds() });
+        }
+      }).addTo(map);
+      districtData.sort((a,b) => a.name.localeCompare(b.name));
+      buildDistrictList();
+      setStatus(districtData.length + ' districts loaded');
+      loadVillages();
+    })
+    .catch(err => setStatus('Error: ' + err.message));
+}
+
+function selectDistrict(name, zoom) {
+  if (activeDistName) {
+    const prev = districtData.find(d => d.name === activeDistName);
+    if (prev) prev.layer.setStyle(dStyle);
+  }
+  activeDistName = name;
+  const item = districtData.find(d => d.name === name);
+  if (!item) return;
+  item.layer.setStyle(dHiStyle);
+  if (zoom) { map.fitBounds(item.bounds, { padding:[30,30], maxZoom:11 }); item.layer.openPopup(); }
+  districtList.querySelectorAll('button').forEach(b => b.classList.toggle('highlighted', b.dataset.name === name));
+}
+
+// Load Villages
+function loadVillages() {
+  setStatus('Loading village data...');
+  fetch(BASE + 'ASSAM_VILLAGE_POINTS.geojson')
+    .then(r => { if (!r.ok) throw new Error('Village data failed.'); return r.json(); })
+    .then(data => {
+      L.geoJSON(data, {
+        pointToLayer(f, latlng) { return L.circleMarker(latlng, {...vStyle, renderer:vRenderer}); },
+        onEachFeature(feature, layer) {
+          const p = feature.properties;
+          const [lng, lat] = feature.geometry.coordinates;
+          layer.bindPopup(villagePopup(p, lat, lng), { maxWidth:240 });
+          layer.on({
+            mouseover() { layer.setStyle(vHiStyle); layer.bringToFront(); },
+            mouseout()  { if (layer !== activeVLayer) layer.setStyle(vStyle); },
+            click()     { if (activeVLayer && activeVLayer !== layer) activeVLayer.setStyle(vStyle); activeVLayer = layer; layer.setStyle(vHiStyle); }
+          });
+          const name = p.VILNAME11 || p.VILNAM_SOI || 'Unnamed';
+          villageData.push({ name, sub:p.SDTNAME||'', district:p.DTNAME||'', lat, lng, layer });
+        }
+      }).addTo(map);
+      villageData.sort((a,b) => a.name.localeCompare(b.name));
+      buildVillageList();
+      setStatus(villageData.length.toLocaleString() + ' villages loaded', true);
+      renderVillageList('');
+    })
+    .catch(err => setStatus('Error: ' + err.message, true));
+}
+
+function flyToVillage(item) {
+  map.setView([item.lat, item.lng], 14, { animate:true });
+  if (activeVLayer && activeVLayer !== item.layer) activeVLayer.setStyle(vStyle);
+  activeVLayer = item.layer;
+  item.layer.setStyle(vHiStyle);
+  item.layer.openPopup();
+}
+
+// Build lists
+function buildVillageList() {
+  villageList.innerHTML = '';
+  villageData.forEach((item, i) => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.dataset.index = i;
+    btn.innerHTML = '<span class="item-name">'+esc(item.name)+'</span>'
+      +'<span class="item-meta">'+esc([item.sub, item.district].filter(Boolean).join(' \u00b7 '))+'</span>';
+    btn.addEventListener('click', () => flyToVillage(item));
+    li.appendChild(btn);
+    villageList.appendChild(li);
+  });
+}
+
+function buildDistrictList() {
+  districtList.innerHTML = '';
+  districtData.forEach(item => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.dataset.name = item.name;
+    btn.innerHTML = '<span class="item-name">'+esc(item.name)+'</span>'
+      +'<span class="item-meta">District \u00b7 Assam</span>';
+    btn.addEventListener('click', () => selectDistrict(item.name, true));
+    li.appendChild(btn);
+    districtList.appendChild(li);
+  });
+  renderDistrictList('');
+}
+
+function renderVillageList(term) {
+  const q = term.toLowerCase().trim();
+  let shown = 0;
+  const items = villageList.querySelectorAll('li');
+  items.forEach((li, i) => {
+    const item = villageData[i];
+    if (!item) { li.hidden = true; return; }
+    const match = !q || item.name.toLowerCase().includes(q)
+      || item.sub.toLowerCase().includes(q)
+      || item.district.toLowerCase().includes(q);
+    li.hidden = !match;
+    if (match) shown++;
+  });
+  searchCount.textContent = q
+    ? shown.toLocaleString() + ' of ' + villageData.length.toLocaleString() + ' villages'
+    : villageData.length.toLocaleString() + ' villages';
+}
+
+function renderDistrictList(term) {
+  const q = term.toLowerCase().trim();
+  let shown = 0;
+  districtList.querySelectorAll('li').forEach(li => {
+    const name = (li.querySelector('button') || {}).dataset?.name || '';
+    const match = !q || name.toLowerCase().includes(q);
+    li.hidden = !match;
+    if (match) shown++;
+  });
+  searchCount.textContent = q
+    ? shown + ' of ' + districtData.length + ' districts'
+    : districtData.length + ' districts';
+}
+
+searchInput.addEventListener('input', e => {
+  if (currentTab === 'villages') renderVillageList(e.target.value);
+  else renderDistrictList(e.target.value);
+});
+
+loadDistricts();
+</script>
+</body>
+</html>
