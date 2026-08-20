@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="An interactive map of Assam's 35 districts." />
-    <title>Assam District Atlas</title>
+    <meta name="description" content="An interactive map of Assam's districts and villages." />
+    <title>Assam Atlas</title>
     <link rel="preconnect" href="https://unpkg.com" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ0kPjS8KQ2H5nQf1LL2jW9a7q1zv7M=" crossorigin="" />
     <style>
@@ -44,6 +44,12 @@
       .sidebar > p { margin:0 0 19px; color:var(--muted); font-size:.87rem; line-height:1.5; }
       #search { width:100%; padding:12px 13px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--ink); font:inherit; outline:none; }
       #search:focus { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+      .layer-toggle { display:flex; align-items:flex-start; gap:10px; margin:18px 0 0; padding:12px; border:1px solid var(--line); border-radius:10px; color:var(--ink); cursor:pointer; }
+      .layer-toggle input { width:16px; height:16px; margin:2px 0 0; accent-color:var(--accent); }
+      .layer-toggle strong, .layer-toggle small { display:block; }
+      .layer-toggle strong { font-size:.87rem; }
+      .layer-toggle small { margin-top:2px; color:var(--muted); font-size:.75rem; line-height:1.35; }
+      #village-status { min-height:1.2em; margin:8px 2px 0; color:var(--muted); font-size:.75rem; line-height:1.35; }
       #districts { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:7px; margin-top:18px; max-height:490px; overflow:auto; padding-right:2px; }
       .district { min-height:38px; padding:8px 9px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--muted); cursor:pointer; font:inherit; font-size:.79rem; text-align:left; transition:background .2s ease, color .2s ease; }
       .district:hover, .district:focus-visible, .district.active { background:var(--accent-soft); color:var(--accent); outline:none; }
@@ -64,29 +70,29 @@
   <body>
     <div class="shell">
       <header>
-        <a class="brand" href="#top" aria-label="Assam District Atlas home"><span class="brand-mark" aria-hidden="true"></span><span>Assam District Atlas</span></a>
+        <a class="brand" href="#top" aria-label="Assam Atlas home"><span class="brand-mark" aria-hidden="true"></span><span>Assam Atlas</span></a>
         <nav aria-label="Main navigation"><a href="#atlas">Explore map</a><a href="https://github.com" target="_blank" rel="noreferrer">Source data</a></nav>
       </header>
       <main id="top">
         <section class="hero" aria-labelledby="title">
           <div>
             <p class="eyebrow">Geographic reference</p>
-            <h1 id="title">Every district, at a glance.</h1>
-            <p class="lede">A clear, interactive view of Assam's 35 district boundaries. Select any district to bring its place on the map into focus.</p>
-            <a class="jump" href="#atlas">Explore districts</a>
+            <h1 id="title">Every place, in context.</h1>
+            <p class="lede">Explore Assam's 35 district boundaries, then turn on the village layer to see the communities within them.</p>
+            <a class="jump" href="#atlas">Explore the map</a>
           </div>
           <div class="art"><img src="Assam_districts_map.svg" alt="Outline map of Assam districts" /><span class="art-label">Assam, India</span></div>
         </section>
         <section class="atlas" id="atlas" aria-labelledby="atlas-title">
-          <div class="section-intro"><h2 id="atlas-title">Find a district</h2><p>Browse the complete district list or choose a boundary directly on the map. Boundaries are supplied from the included GeoJSON source.</p></div>
+          <div class="section-intro"><h2 id="atlas-title">Find a place</h2><p>Browse districts, choose a boundary, or load the complete Assam village layer. Village boundaries are kept optional for a faster first map load.</p></div>
           <div class="map-layout">
             <div id="map" aria-label="Interactive map of Assam districts"></div>
-            <aside class="sidebar" aria-label="District selector"><h3>35 districts</h3><p>Click a name to zoom to its boundary.</p><label class="sr-only" for="search">Filter districts</label><input id="search" type="search" placeholder="Filter districts" autocomplete="off" /><div id="districts" aria-live="polite"></div></aside>
+            <aside class="sidebar" aria-label="Map controls"><h3>35 districts</h3><p>Click a name to zoom to its boundary.</p><label class="sr-only" for="search">Filter districts</label><input id="search" type="search" placeholder="Filter districts" autocomplete="off" /><label class="layer-toggle" for="villages-toggle"><input id="villages-toggle" type="checkbox" checked /><span><strong>Show villages</strong><small>Loads 21,032 village markers. Click a marker for its details.</small></span></label><p id="village-status" aria-live="polite">Village markers will appear shortly…</p><div id="districts" aria-live="polite"></div></aside>
           </div>
-          <div class="fact-strip" aria-label="Map summary"><div class="fact"><strong>35</strong><span>district features</span></div><div class="fact"><strong>GeoJSON</strong><span>open geographic boundary data</span></div></div>
+          <div class="fact-strip" aria-label="Map summary"><div class="fact"><strong>35</strong><span>district features</span></div><div class="fact"><strong>21,032</strong><span>optional village features</span></div></div>
         </section>
       </main>
-      <footer>Built from the Assam district boundary dataset in this repository.</footer>
+      <footer>Built from Assam district and village boundary datasets in this repository.</footer>
     </div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
@@ -97,6 +103,13 @@
       const layerByName = new Map();
       const buttonByName = new Map();
       let districtLayer;
+      let villageLayer;
+      let villageDataPromise;
+      const villageToggle = document.getElementById('villages-toggle');
+      const villageStatus = document.getElementById('village-status');
+      const villageStyle = { color: '#9e4f0a', weight: 1, fillColor: '#f2a23a', fillOpacity: .82, radius: 3 };
+      const villageHighlightStyle = { color: '#7c3805', weight: 1.5, fillColor: '#ffd37c', fillOpacity: 1, radius: 5 };
+      const villageRenderer = L.canvas({ padding: .5 });
       function selectDistrict(name, shouldZoom = true) {
         layerByName.forEach((layer, itemName) => layer.setStyle(itemName === name ? highlightStyle : defaultStyle));
         buttonByName.forEach((button, itemName) => button.classList.toggle('active', itemName === name));
@@ -110,9 +123,38 @@
           button.addEventListener('click', () => selectDistrict(name)); target.appendChild(button); buttonByName.set(name, button);
         });
       }
+      function villageName(properties) { return properties.VILNAME11 || properties.VILNAM_SOI || 'Unnamed village'; }
+      function villagePopup(properties) {
+        const village = document.createElement('strong'); village.textContent = villageName(properties);
+        const detail = document.createElement('div'); detail.style.cssText = 'margin-top:5px;font-size:.82rem;font-weight:400';
+        detail.textContent = [properties.SDTNAME, properties.DTNAME].filter(Boolean).join(', ');
+        const wrapper = document.createElement('div'); wrapper.append(village, detail); return wrapper;
+      }
+      async function loadVillages() {
+        if (villageLayer) return villageLayer;
+        if (!villageDataPromise) {
+          villageStatus.textContent = 'Loading village boundaries…';
+          villageDataPromise = fetch('ASSAM_VILLAGE_POINTS.geojson').then(response => {
+            if (!response.ok) throw new Error('Village data could not be loaded.'); return response.json();
+          }).then(data => L.geoJSON(data, { pointToLayer(feature, latlng) { return L.circleMarker(latlng, { ...villageStyle, renderer: villageRenderer }); }, onEachFeature(feature, layer) {
+            layer.bindPopup(villagePopup(feature.properties));
+            layer.on({ mouseover() { layer.setStyle(villageHighlightStyle); }, mouseout() { layer.setStyle(villageStyle); } });
+          }}));
+        }
+        villageLayer = await villageDataPromise;
+        villageStatus.textContent = `${villageLayer.getLayers().length.toLocaleString()} village boundaries loaded`;
+        return villageLayer;
+      }
+      villageToggle.addEventListener('change', async () => {
+        if (!villageToggle.checked) { if (villageLayer) map.removeLayer(villageLayer); villageStatus.textContent = 'Village boundaries hidden'; return; }
+        villageToggle.disabled = true;
+        try { const layer = await loadVillages(); if (villageToggle.checked) layer.addTo(map); }
+        catch (error) { villageToggle.checked = false; villageStatus.textContent = error.message; }
+        finally { villageToggle.disabled = false; }
+      });
       fetch('Assam_districts.geojson').then(response => { if (!response.ok) throw new Error('Map data could not be loaded.'); return response.json(); }).then(data => {
         districtLayer = L.geoJSON(data, { style: defaultStyle, onEachFeature(feature, layer) { const name = feature.properties.name; layer.bindPopup(name); layer.on({ mouseover() { selectDistrict(name, false); }, mouseout() { layer.setStyle(defaultStyle); const active = document.querySelector('.district.active'); if (active) selectDistrict(active.textContent, false); }, click() { selectDistrict(name); } }); layerByName.set(name, layer); } }).addTo(map);
-        map.fitBounds(districtLayer.getBounds(), { padding: [30, 30] }); makeList(data.features);
+        map.fitBounds(districtLayer.getBounds(), { padding: [30, 30] }); makeList(data.features); villageToggle.dispatchEvent(new Event('change'));
       }).catch(error => { document.getElementById('map').innerHTML = '<p style="padding:2rem;color:#526359">' + error.message + '</p>'; });
       document.getElementById('search').addEventListener('input', event => { const term = event.target.value.trim().toLowerCase(); buttonByName.forEach((button, name) => button.hidden = !name.toLowerCase().includes(term)); });
     </script>
