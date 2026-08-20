@@ -241,9 +241,17 @@ const map = L.map('map', {
 });
 L.control.zoom({ position: 'topright' }).addTo(map);
 
-// OPENSTREETMAP TILE LAYERS
-const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+// OPENSTREETMAP & CARTO TILE LAYERS
+const cartoVoyager = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd',
+  maxZoom: 20,
+  keepBuffer: 1
+});
+
+const osmStandard = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  subdomains: 'abc',
   maxZoom: 19,
   keepBuffer: 1
 });
@@ -256,16 +264,9 @@ const osmHot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.pn
 });
 
 const osmCyclOSM = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://www.cyclosm.org">CyclOSM</a>',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://web.cyclosm.org">CyclOSM</a>',
   subdomains: 'abc',
   maxZoom: 18,
-  keepBuffer: 1
-});
-
-const osmTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-  attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
-  subdomains: 'abc',
-  maxZoom: 17,
   keepBuffer: 1
 });
 
@@ -275,13 +276,13 @@ const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/s
   keepBuffer: 1
 });
 
-osmStandard.addTo(map);
+cartoVoyager.addTo(map);
 
 L.control.layers({
+  "🚀 Fast Vector Map (CARTO)": cartoVoyager,
   "🗺️ OpenStreetMap Standard": osmStandard,
   "🏥 OSM Humanitarian (HOT)": osmHot,
   "🚲 OSM CyclOSM": osmCyclOSM,
-  "⛰️ OSM Topo (OpenTopo)": osmTopo,
   "🛰️ Esri Satellite": esriSatellite
 }, null, { position: 'bottomleft' }).addTo(map);
 
@@ -293,8 +294,8 @@ const vPolyStyle = { color: '#b02000', weight: 3, fillColor: '#f05010', fillOpac
 
 // STATE
 let currentTab          = 'v';
-let districtData        = [];   // [{name, geojson, bounds}]
-let villageData         = [];   // [{id, name, sub, district, lat, lng}]
+let districtData        = [];   // [{name, geojson}]
+let villageData         = [];   // [{id, name, sub, district, lat, lng, _searchKey}]
 let filteredVillages    = [];
 let villageDisplayCount = 80;
 let mobilePanelShown    = 'list';
@@ -318,6 +319,24 @@ const listPane     = document.getElementById('list-pane');
 const mapPane      = document.getElementById('map-pane');
 const vCount       = document.getElementById('v-count');
 const dCount       = document.getElementById('d-count');
+
+// EVENT DELEGATION FOR VILLAGE & DISTRICT LISTS
+villageList.addEventListener('click', e => {
+  const btn = e.target.closest('.v-item');
+  if (!btn) return;
+  const idx = Number(btn.dataset.idx);
+  if (!isNaN(idx) && filteredVillages[idx]) {
+    showVillage(filteredVillages[idx], btn);
+  }
+});
+
+districtList.addEventListener('click', e => {
+  const btn = e.target.closest('.d-item');
+  if (!btn) return;
+  const name = btn.dataset.name;
+  const item = districtData.find(d => d.name === name);
+  if (item) showDistrict(item, btn);
+});
 
 // HELPERS
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -413,7 +432,7 @@ searchInput.addEventListener('input',e=>{
   const v=e.target.value;
   clearBtn.style.display=v?'block':'none';
   clearTimeout(searchDebounceTimer);
-  searchDebounceTimer = setTimeout(()=> handleSearchInput(v), 120);
+  searchDebounceTimer = setTimeout(()=> handleSearchInput(v), 100);
 });
 clearBtn.addEventListener('click',()=>{
   searchInput.value=''; clearBtn.style.display='none';
@@ -444,21 +463,19 @@ function renderVillageBatch(reset = false){
   if (batch.length === 0) return;
 
   const frag = document.createDocumentFragment();
-  batch.forEach(item => {
+  for (let i = 0; i < batch.length; i++) {
+    const item = batch[i];
+    const globalIdx = renderedVillageCount + i;
     const li = document.createElement('li');
-    const btn = document.createElement('button');
-    btn.className = 'list-item-btn v-item';
-    btn.innerHTML = '<span class="dot"></span><span class="item-text"><span class="item-name">'+esc(item.name)+'</span><span class="item-meta">'+esc([item.sub,item.district].filter(Boolean).join(' · '))+'</span></span>';
-    btn.addEventListener('click', () => showVillage(item, btn));
-    li.appendChild(btn);
+    li.innerHTML = '<button class="list-item-btn v-item" data-idx="'+globalIdx+'"><span class="dot"></span><span class="item-text"><span class="item-name">'+esc(item.name)+'</span><span class="item-meta">'+esc([item.sub,item.district].filter(Boolean).join(' · '))+'</span></span></button>';
     frag.appendChild(li);
-  });
+  }
   villageList.appendChild(frag);
   renderedVillageCount = villageDisplayCount;
 }
 
 panelV.addEventListener('scroll', () => {
-  if (panelV.scrollTop + panelV.clientHeight >= panelV.scrollHeight - 120) {
+  if (panelV.scrollTop + panelV.clientHeight >= panelV.scrollHeight - 140) {
     if (villageDisplayCount < filteredVillages.length) {
       villageDisplayCount += 60;
       renderVillageBatch(false);
@@ -495,10 +512,8 @@ function buildDistrictList(){
   const frag=document.createDocumentFragment();
   districtData.forEach(item=>{
     const li=document.createElement('li'); li.dataset.name=item.name;
-    const btn=document.createElement('button'); btn.className='list-item-btn'; btn.dataset.name=item.name;
-    btn.innerHTML='<span class="dot"></span><span class="item-text"><span class="item-name">'+esc(item.name)+'</span><span class="item-meta">District · Assam</span></span>';
-    btn.addEventListener('click',()=>showDistrict(item,btn));
-    li.appendChild(btn); frag.appendChild(li);
+    li.innerHTML='<button class="list-item-btn d-item" data-name="'+esc(item.name)+'"><span class="dot"></span><span class="item-text"><span class="item-name">'+esc(item.name)+'</span><span class="item-meta">District · Assam</span></span></button>';
+    frag.appendChild(li);
   });
   districtList.appendChild(frag);
   filterDistricts('');
@@ -526,13 +541,13 @@ function showVillage(item, btn){
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
   if(btn) btn.classList.add('highlighted');
 
-  // 1. Instant 0ms visual feedback marker
+  // 1. Instant visual feedback marker without compounding animations
   activeVLayer = L.circleMarker([item.lat, item.lng], {
     radius: 9, color: '#b02000', weight: 2.5, fillColor: '#f05010', fillOpacity: .95
   }).addTo(map);
   activeVLayer.bindPopup(popVillage(item.name, item.sub, item.district, item.lat, item.lng), { maxWidth: 240 });
   
-  map.setView([item.lat, item.lng], 14, { animate: true });
+  map.setView([item.lat, item.lng], 14, { animate: false });
   activeVLayer.openPopup();
 
   if(isMobile()) {
@@ -551,7 +566,7 @@ function showVillage(item, btn){
       coordinates: coords
     };
 
-    // Swap marker with Polygon boundary layer!
+    // Swap marker with Polygon boundary layer
     if (activeVLayer) map.removeLayer(activeVLayer);
 
     activeVLayer = L.geoJSON(geojsonGeom, { style: vPolyStyle }).addTo(map);
@@ -560,7 +575,7 @@ function showVillage(item, btn){
     try {
       const polyBounds = activeVLayer.getBounds();
       if (polyBounds.isValid()) {
-        map.fitBounds(polyBounds, { padding: [35, 35], maxZoom: 15 });
+        map.fitBounds(polyBounds, { padding: [35, 35], maxZoom: 15, animate: true });
       }
     } catch(e) {}
 
@@ -587,7 +602,7 @@ function showDistrict(item, btn){
   try {
     const bounds = activeDLayer.getBounds();
     if(bounds.isValid()){
-      map.fitBounds(bounds, { padding: [35, 35], maxZoom: 11 });
+      map.fitBounds(bounds, { padding: [35, 35], maxZoom: 11, animate: true });
     }
   } catch(e){}
 
@@ -604,10 +619,9 @@ function loadDistricts(){
     .then(r=>{if(!r.ok) throw new Error('District data failed');return r.json();})
     .then(data=>{
       data.features.forEach(f=>{
-        const tmp = L.geoJSON(f);
-        districtData.push({name: f.properties.name, geojson: f, bounds: tmp.getBounds()});
+        districtData.push({name: f.properties.name, geojson: f});
       });
-      districtData.sort((a,b)=>a.name.localeCompare(b.name));
+      districtData.sort((a,b)=>(a.name < b.name ? -1 : (a.name > b.name ? 1 : 0)));
       dCount.textContent=districtData.length;
       buildDistrictList();
       setStatus('Districts ready. Loading villages…');
@@ -631,7 +645,7 @@ function loadVillages(){
         item._searchKey = `${item.name} ${item.sub||''} ${item.district||''}`.toLowerCase();
         villageData.push(item);
       });
-      villageData.sort((a,b)=>a.name.localeCompare(b.name));
+      villageData.sort((a,b)=>(a.name < b.name ? -1 : (a.name > b.name ? 1 : 0)));
       vCount.textContent=villageData.length.toLocaleString();
       setStatus(villageData.length.toLocaleString()+' villages ready',true);
       filterVillages('');
