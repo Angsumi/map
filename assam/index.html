@@ -111,7 +111,8 @@
     .list-item-btn{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
                    padding:11px 14px;background:none;border:none;
                    border-bottom:1px solid var(--border);font:inherit;color:var(--ink);
-                   cursor:pointer;transition:background .12s;}
+                   cursor:pointer;transition:background .12s;
+                   touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
     .list-item-btn:hover{background:var(--soft);}
     .list-item-btn.highlighted{background:var(--soft);}
     .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--accent);}
