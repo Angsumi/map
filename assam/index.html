@@ -3,8 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Assam Village & District Portal — search 35 districts and 21,032 villages on an interactive Google map." />
+  <meta name="description" content="Assam Village & District Portal — search 35 districts and 21,032 villages on an interactive OpenStreetMap." />
   <title>Assam Map Portal</title>
+  <link rel="preconnect" href="https://tile.openstreetmap.org" />
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ0kPjS8KQ2H5nQf1LL2jW9a7q1zv7M=" crossorigin="" />
   <style>
     :root {
       color-scheme: light dark;
@@ -144,7 +147,8 @@
     }
     #map{position:absolute;top:0;bottom:0;left:0;right:0;width:100%;height:100%;background:#e4ece6;}
 
-    /* infoWindow styling */
+    /* popups */
+    .leaflet-popup-content{margin:12px 14px;}
     .pop-name{font-weight:800;font-size:.95rem;margin-bottom:3px;color:#101c16;}
     .pop-meta{color:#526359;font-size:.79rem;margin-bottom:7px;}
     .pop-links{display:flex;gap:6px;flex-wrap:wrap;}
@@ -169,7 +173,7 @@
   <a class="gh-link" href="https://github.com/Angsumi/map" target="_blank" rel="noreferrer">GitHub ↗</a>
 </header>
 
-<!-- controls: tabs + search -->
+<!-- always-visible controls: tabs + search -->
 <div class="controls">
   <div class="tab-bar" role="tablist">
     <button class="tab-btn active" id="tab-v" role="tab" aria-selected="true" aria-controls="panel-v">
@@ -219,24 +223,82 @@
 
 </main>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 /* ============================================================
-   Assam Map Portal
-   Google Maps JS API Engine with GPU-accelerated vector tiles
+   Assam Map Portal — OpenStreetMap Engine
+   Fast, smooth rendering with zero DOM bloat & OSM view options
    =========================================================== */
 
-let map;
-let infoWindow;
-let activeMarker  = null;
-let activePolygon = null;
+// INITIALIZE LEAFLET MAP WITH CANVAS ACCELERATION & PRE-BUFFERING
+const map = L.map('map', {
+  zoomControl: false,
+  scrollWheelZoom: true,
+  preferCanvas: true,
+  fadeAnimation: false,
+  zoomAnimation: true,
+  trackResize: true
+});
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+// OPENSTREETMAP TILE OPTIONS (keepBuffer: 4 caches surrounding tiles for fast pan)
+const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+  keepBuffer: 4
+});
+
+const osmHot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles by <a href="https://www.hotosm.org/">HOT</a>',
+  subdomains: 'abc',
+  maxZoom: 19,
+  keepBuffer: 4
+});
+
+const osmCyclOSM = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://www.cyclosm.org">CyclOSM</a>',
+  subdomains: 'abc',
+  maxZoom: 18,
+  keepBuffer: 4
+});
+
+const osmTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+  subdomains: 'abc',
+  maxZoom: 17,
+  keepBuffer: 4
+});
+
+const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
+  maxZoom: 18,
+  keepBuffer: 4
+});
+
+// Default layer: OpenStreetMap Standard
+osmStandard.addTo(map);
+
+L.control.layers({
+  "🗺️ OpenStreetMap Standard": osmStandard,
+  "🏥 OSM Humanitarian (HOT)": osmHot,
+  "🚲 OSM CyclOSM": osmCyclOSM,
+  "⛰️ OSM Topo (OpenTopo)": osmTopo,
+  "🛰️ Esri Satellite": esriSatellite
+}, null, { position: 'bottomleft' }).addTo(map);
+
+map.setView([26.2, 92.9], 7);
+
+const dStyle = { color: '#0a4f34', weight: 2.5, fillColor: '#3db87a', fillOpacity: .5 };
 
 // STATE
 let currentTab          = 'v';
-let districtData        = [];   // [{name, geojson}]
+let districtData        = [];   // [{name, geojson, bounds}]
 let villageData         = [];   // [{name, sub, district, lat, lng}]
 let filteredVillages    = [];
 let villageDisplayCount = 80;
 let mobilePanelShown    = 'list';
+let activeVMarker       = null; // single village pin
+let activeDLayer        = null; // single district boundary
 
 // DOM
 const searchInput  = document.getElementById('search-input');
@@ -261,6 +323,10 @@ function osm(lat,lng){return 'https://www.openstreetmap.org/?mlat='+lat+'&mlon='
 function setStatus(msg,done){statusText.textContent=msg;if(done)spinner.classList.add('done');}
 const isMobile=()=>window.innerWidth<=768;
 
+function resizeMap(){
+  setTimeout(()=> map.invalidateSize(), 100);
+}
+
 function popVillage(name,sub,district,lat,lng){
   const meta=[sub,district].filter(Boolean).join(', ');
   return '<div class="pop-name">'+esc(name)+'</div>'
@@ -276,32 +342,10 @@ function popDistrict(name){
     +'<div class="pop-links"><a class="pop-link" href="'+gmD(name)+'" target="_blank" rel="noreferrer">📍 Google Maps</a></div>';
 }
 
-// GOOGLE MAPS INITIALIZATION
-function initMap() {
-  map = new google.maps.Map(document.getElementById('map'), {
-    center: { lat: 26.2, lng: 92.9 },
-    zoom: 7,
-    zoomControl: true,
-    mapTypeControl: true,
-    mapTypeControlOptions: {
-      style: google.maps.MapTypeControlStyle.DROPDOWN_MENU,
-      position: google.maps.ControlPosition.TOP_RIGHT
-    },
-    streetViewControl: false,
-    fullscreenControl: true
-  });
-
-  infoWindow = new google.maps.InfoWindow();
-
-  // Load datasets after map is ready
-  loadDistricts();
-}
-
 // CLEAR MAP OVERLAYS
 function clearMap(){
-  if(activeMarker){ activeMarker.setMap(null); activeMarker=null; }
-  if(activePolygon){ activePolygon.setMap(null); activePolygon=null; }
-  if(infoWindow){ infoWindow.close(); }
+  if(activeVMarker){ map.removeLayer(activeVMarker); activeVMarker = null; }
+  if(activeDLayer){ map.removeLayer(activeDLayer); activeDLayer = null; }
 }
 
 // MOBILE TOGGLE
@@ -311,7 +355,7 @@ document.getElementById('show-map-btn').addEventListener('click',()=>{
   document.getElementById('show-list-btn').classList.remove('active');
   listPane.classList.add('mobile-hidden');
   mapPane.classList.remove('mobile-hidden');
-  if(google.maps && map) google.maps.event.trigger(map, 'resize');
+  resizeMap();
 });
 document.getElementById('show-list-btn').addEventListener('click',()=>{
   mobilePanelShown='list';
@@ -328,8 +372,9 @@ window.addEventListener('resize',()=>{
     if(mobilePanelShown==='map'){listPane.classList.add('mobile-hidden');mapPane.classList.remove('mobile-hidden');}
     else{mapPane.classList.add('mobile-hidden');listPane.classList.remove('mobile-hidden');}
   }
-  if(google.maps && map) google.maps.event.trigger(map, 'resize');
+  resizeMap();
 });
+window.addEventListener('load', resizeMap);
 
 // TAB SWITCH
 function switchTab(tab){
@@ -346,6 +391,7 @@ function switchTab(tab){
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
   if(isV) filterVillages(''); else filterDistricts('');
   if(isMobile()&&mobilePanelShown==='map') document.getElementById('show-list-btn').click();
+  resizeMap();
 }
 document.getElementById('tab-v').addEventListener('click',()=>switchTab('v'));
 document.getElementById('tab-d').addEventListener('click',()=>switchTab('d'));
@@ -362,7 +408,7 @@ clearBtn.addEventListener('click',()=>{
   searchInput.focus();
 });
 
-// VIRTUAL CHUNKED RENDER FOR VILLAGES
+// ULTRA-FAST VIRTUAL CHUNKED RENDER FOR 21,032 VILLAGES
 function renderVillageBatch(){
   const batch = filteredVillages.slice(0, villageDisplayCount);
   villageList.innerHTML = '';
@@ -438,82 +484,44 @@ function buildDistrictList(){
   filterDistricts('');
 }
 
-// RENDER SINGLE VILLAGE ON GOOGLE MAP
-function showVillage(item, btn){
+// SHOW VILLAGE — SINGLE PIN ON OPENSTREETMAP
+function showVillage(item,btn){
   clearMap();
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
   if(btn) btn.classList.add('highlighted');
 
-  const pos = { lat: item.lat, lng: item.lng };
-
-  activeMarker = new google.maps.Marker({
-    position: pos,
-    map: map,
-    title: item.name,
-    animation: google.maps.Animation.DROP
-  });
-
-  infoWindow.setContent(popVillage(item.name, item.sub, item.district, item.lat, item.lng));
-  infoWindow.open(map, activeMarker);
-
-  map.panTo(pos);
-  map.setZoom(14);
-
+  activeVMarker = L.circleMarker([item.lat, item.lng], {
+    radius: 9, color: '#8a2800', weight: 2.5, fillColor: '#e85010', fillOpacity: .95
+  }).addTo(map);
+  activeVMarker.bindPopup(popVillage(item.name, item.sub, item.district, item.lat, item.lng), { maxWidth: 240 });
+  
   if(isMobile()) {
     document.getElementById('show-map-btn').click();
   }
+  resizeMap();
+  setTimeout(()=>{
+    map.setView([item.lat, item.lng], 14, { animate: true });
+    if(activeVMarker) activeVMarker.openPopup();
+  }, 100);
 }
 
-// CONVERT GEOJSON POLYGON TO GOOGLE MAPS PATHS
-function geoJsonToGooglePaths(geom) {
-  const type = geom.type;
-  const coords = geom.coordinates;
-  if (type === 'Polygon') {
-    return coords.map(ring => ring.map(c => ({ lat: c[1], lng: c[0] })));
-  } else if (type === 'MultiPolygon') {
-    return coords.map(poly => poly.map(ring => ring.map(c => ({ lat: c[1], lng: c[0] }))));
-  }
-  return [];
-}
-
-// RENDER SINGLE DISTRICT ON GOOGLE MAP
-function showDistrict(item, btn){
+// SHOW DISTRICT — SINGLE BOUNDARY POLYGON ON OPENSTREETMAP
+function showDistrict(item,btn){
   clearMap();
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
   if(btn) btn.classList.add('highlighted');
 
-  const paths = geoJsonToGooglePaths(item.geojson.geometry);
-
-  activePolygon = new google.maps.Polygon({
-    paths: paths,
-    strokeColor: '#0a4f34',
-    strokeOpacity: 0.9,
-    strokeWeight: 2.5,
-    fillColor: '#3db87a',
-    fillOpacity: 0.45,
-    map: map
-  });
-
-  const bounds = new google.maps.LatLngBounds();
-  function extendBounds(obj) {
-    if (Array.isArray(obj)) {
-      obj.forEach(extendBounds);
-    } else if (obj && typeof obj.lat === 'number') {
-      bounds.extend(obj);
-    }
-  }
-  extendBounds(paths);
-
-  map.fitBounds(bounds);
-
-  const center = bounds.getCenter();
-  infoWindow.setContent(popDistrict(item.name));
-  infoWindow.setPosition(center);
-  infoWindow.open(map);
-
+  activeDLayer = L.geoJSON(item.geojson, { style: dStyle }).addTo(map);
+  activeDLayer.bindPopup(popDistrict(item.name), { maxWidth: 220 });
+  
   if(isMobile()) {
     document.getElementById('show-map-btn').click();
   }
+  resizeMap();
+  setTimeout(()=>{
+    map.fitBounds(item.bounds, { padding: [40, 40], maxZoom: 11 });
+    if(activeDLayer) activeDLayer.openPopup();
+  }, 100);
 }
 
 // LOAD DATA
@@ -524,7 +532,8 @@ function loadDistricts(){
     .then(r=>{if(!r.ok) throw new Error('District data failed');return r.json();})
     .then(data=>{
       data.features.forEach(f=>{
-        districtData.push({name:f.properties.name, geojson:f});
+        const tmp = L.geoJSON(f);
+        districtData.push({name: f.properties.name, geojson: f, bounds: tmp.getBounds()});
       });
       districtData.sort((a,b)=>a.name.localeCompare(b.name));
       dCount.textContent=districtData.length;
@@ -544,11 +553,12 @@ function loadVillages(){
       vCount.textContent=villageData.length.toLocaleString();
       setStatus(villageData.length.toLocaleString()+' villages ready',true);
       filterVillages('');
+      resizeMap();
     })
     .catch(err=>setStatus('Error: '+err.message,true));
 }
+
+loadDistricts();
 </script>
-<!-- Google Maps JS API -->
-<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY_HERE&callback=initMap" async defer></script>
 </body>
 </html>
