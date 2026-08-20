@@ -173,7 +173,7 @@
   <a class="gh-link" href="https://github.com/Angsumi/map" target="_blank" rel="noreferrer">GitHub ↗</a>
 </header>
 
-<!-- always-visible controls: tabs + search -->
+<!-- controls: tabs + search -->
 <div class="controls">
   <div class="tab-bar" role="tablist">
     <button class="tab-btn active" id="tab-v" role="tab" aria-selected="true" aria-controls="panel-v">
@@ -226,11 +226,11 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 /* ============================================================
-   Assam Map Portal — OpenStreetMap Engine
-   Fast, smooth rendering with zero DOM bloat & OSM view options
+   Assam Map Portal — Polygon Boundary Engine
+   Renders simplified polygon boundary of ONLY the clicked village / district
    =========================================================== */
 
-// INITIALIZE LEAFLET MAP WITH CANVAS ACCELERATION & PRE-BUFFERING
+// INITIALIZE LEAFLET MAP WITH CANVAS ACCELERATION
 const map = L.map('map', {
   zoomControl: false,
   scrollWheelZoom: true,
@@ -241,7 +241,7 @@ const map = L.map('map', {
 });
 L.control.zoom({ position: 'topright' }).addTo(map);
 
-// OPENSTREETMAP TILE OPTIONS (keepBuffer: 4 caches surrounding tiles for fast pan)
+// OPENSTREETMAP TILE OPTIONS
 const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   maxZoom: 19,
@@ -275,7 +275,6 @@ const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/s
   keepBuffer: 4
 });
 
-// Default layer: OpenStreetMap Standard
 osmStandard.addTo(map);
 
 L.control.layers({
@@ -289,16 +288,20 @@ L.control.layers({
 map.setView([26.2, 92.9], 7);
 
 const dStyle = { color: '#0a4f34', weight: 2.5, fillColor: '#3db87a', fillOpacity: .5 };
+const vPolyStyle = { color: '#b03000', weight: 2.5, fillColor: '#f05818', fillOpacity: .55 };
 
 // STATE
 let currentTab          = 'v';
 let districtData        = [];   // [{name, geojson, bounds}]
-let villageData         = [];   // [{name, sub, district, lat, lng}]
+let villageData         = [];   // [{id, name, sub, district, lat, lng}]
 let filteredVillages    = [];
 let villageDisplayCount = 80;
 let mobilePanelShown    = 'list';
-let activeVMarker       = null; // single village pin
-let activeDLayer        = null; // single district boundary
+let activeVLayer        = null; // single village polygon layer
+let activeDLayer        = null; // single district polygon layer
+
+// CACHE FOR DISTRICT POLYGON JSON FILES
+const districtPolygonCache = new Map();
 
 // DOM
 const searchInput  = document.getElementById('search-input');
@@ -344,7 +347,7 @@ function popDistrict(name){
 
 // CLEAR MAP OVERLAYS
 function clearMap(){
-  if(activeVMarker){ map.removeLayer(activeVMarker); activeVMarker = null; }
+  if(activeVLayer){ map.removeLayer(activeVLayer); activeVLayer = null; }
   if(activeDLayer){ map.removeLayer(activeDLayer); activeDLayer = null; }
 }
 
@@ -484,29 +487,57 @@ function buildDistrictList(){
   filterDistricts('');
 }
 
-// SHOW VILLAGE — SINGLE PIN ON OPENSTREETMAP
-function showVillage(item,btn){
+// FETCH & CACHE DISTRICT POLYGONS ON DEMAND
+function getVillagePolygon(districtName, villageId) {
+  const slug = districtName.replace(/[^A-Z0-9]/g, '_');
+  if (districtPolygonCache.has(slug)) {
+    const dMap = districtPolygonCache.get(slug);
+    return Promise.resolve(dMap[String(villageId)] || null);
+  }
+  return fetch('villages-data/' + slug + '.json')
+    .then(r => { if(!r.ok) throw new Error('Polygon load failed'); return r.json(); })
+    .then(dMap => {
+      districtPolygonCache.set(slug, dMap);
+      return dMap[String(villageId)] || null;
+    })
+    .catch(() => null);
+}
+
+// SHOW VILLAGE — RENDER ITS EXACT SIMPLIFIED POLYGON BOUNDARY
+function showVillage(item, btn){
   clearMap();
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
   if(btn) btn.classList.add('highlighted');
 
-  activeVMarker = L.circleMarker([item.lat, item.lng], {
-    radius: 9, color: '#8a2800', weight: 2.5, fillColor: '#e85010', fillOpacity: .95
-  }).addTo(map);
-  activeVMarker.bindPopup(popVillage(item.name, item.sub, item.district, item.lat, item.lng), { maxWidth: 240 });
-  
-  if(isMobile()) {
-    document.getElementById('show-map-btn').click();
-  }
-  resizeMap();
-  setTimeout(()=>{
-    map.setView([item.lat, item.lng], 14, { animate: true });
-    if(activeVMarker) activeVMarker.openPopup();
-  }, 100);
+  getVillagePolygon(item.district, item.id).then(vData => {
+    if(!vData || !vData.geom) {
+      // Fallback if polygon unavailable: show point marker
+      activeVLayer = L.circleMarker([item.lat, item.lng], {
+        radius: 9, color: '#8a2800', weight: 2.5, fillColor: '#e85010', fillOpacity: .95
+      }).addTo(map);
+      activeVLayer.bindPopup(popVillage(item.name, item.sub, item.district, item.lat, item.lng), { maxWidth: 240 });
+      map.setView([item.lat, item.lng], 14, { animate: true });
+      setTimeout(()=> { if(activeVLayer) activeVLayer.openPopup(); }, 100);
+      return;
+    }
+
+    // Render exact Village Polygon Boundary!
+    activeVLayer = L.geoJSON(vData.geom, { style: vPolyStyle }).addTo(map);
+    activeVLayer.bindPopup(popVillage(item.name, item.sub, item.district, item.lat, item.lng), { maxWidth: 240 });
+    
+    if(isMobile()) {
+      document.getElementById('show-map-btn').click();
+    }
+    resizeMap();
+    setTimeout(()=>{
+      map.fitBounds(activeVLayer.getBounds(), { padding: [40, 40], maxZoom: 15 });
+      if(activeVLayer) activeVLayer.openPopup();
+    }, 100);
+  });
 }
 
-// SHOW DISTRICT — SINGLE BOUNDARY POLYGON ON OPENSTREETMAP
-function showDistrict(item,btn){
+// SHOW DISTRICT — RENDER ITS EXACT BOUNDARY POLYGON
+function showDistrict(item, btn){
   clearMap();
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
   if(btn) btn.classList.add('highlighted');
@@ -545,10 +576,18 @@ function loadDistricts(){
 }
 
 function loadVillages(){
-  fetch('villages-slim.json')
-    .then(r=>{if(!r.ok) throw new Error('Village data failed');return r.json();})
+  fetch('villages-index.json')
+    .catch(()=> fetch('villages-slim.json'))
+    .then(r=>{if(!r.ok) throw new Error('Village index failed');return r.json();})
     .then(rows=>{
-      rows.forEach(([name,sub,district,lat,lng])=>villageData.push({name,sub,district,lat,lng}));
+      rows.forEach(r => {
+        // format: [id, name, sub, district, lat, lng] or [name, sub, district, lat, lng]
+        if (typeof r[0] === 'number') {
+          villageData.push({ id: r[0], name: r[1], sub: r[2], district: r[3], lat: r[4], lng: r[5] });
+        } else {
+          villageData.push({ id: villageData.length, name: r[0], sub: r[1], district: r[2], lat: r[3], lng: r[4] });
+        }
+      });
       villageData.sort((a,b)=>a.name.localeCompare(b.name));
       vCount.textContent=villageData.length.toLocaleString();
       setStatus(villageData.length.toLocaleString()+' villages ready',true);
