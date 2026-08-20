@@ -245,34 +245,34 @@ L.control.zoom({ position: 'topright' }).addTo(map);
 const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   maxZoom: 19,
-  keepBuffer: 4
+  keepBuffer: 1
 });
 
 const osmHot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Style by <a href="https://www.hotosm.org/">HOT</a>',
   subdomains: 'abc',
   maxZoom: 19,
-  keepBuffer: 4
+  keepBuffer: 1
 });
 
 const osmCyclOSM = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://www.cyclosm.org">CyclOSM</a>',
   subdomains: 'abc',
   maxZoom: 18,
-  keepBuffer: 4
+  keepBuffer: 1
 });
 
 const osmTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
   attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | Style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
   subdomains: 'abc',
   maxZoom: 17,
-  keepBuffer: 4
+  keepBuffer: 1
 });
 
 const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics',
   maxZoom: 18,
-  keepBuffer: 4
+  keepBuffer: 1
 });
 
 osmStandard.addTo(map);
@@ -327,8 +327,12 @@ function osm(lat,lng){return 'https://www.openstreetmap.org/?mlat='+lat+'&mlon='
 function setStatus(msg,done){statusText.textContent=msg;if(done)spinner.classList.add('done');}
 const isMobile=()=>window.innerWidth<=768;
 
+let resizeAnimationFrame = null;
 function resizeMap(){
-  setTimeout(()=> map.invalidateSize(), 80);
+  if (resizeAnimationFrame) cancelAnimationFrame(resizeAnimationFrame);
+  resizeAnimationFrame = requestAnimationFrame(() => {
+    map.invalidateSize();
+  });
 }
 
 function popVillage(name,sub,district,lat,lng){
@@ -400,11 +404,16 @@ function switchTab(tab){
 document.getElementById('tab-v').addEventListener('click',()=>switchTab('v'));
 document.getElementById('tab-d').addEventListener('click',()=>switchTab('d'));
 
-// SEARCH
+// DEBOUNCED SEARCH HANDLER
+let searchDebounceTimer = null;
+function handleSearchInput(val){
+  if(currentTab==='v') filterVillages(val); else filterDistricts(val);
+}
 searchInput.addEventListener('input',e=>{
   const v=e.target.value;
   clearBtn.style.display=v?'block':'none';
-  if(currentTab==='v') filterVillages(v); else filterDistricts(v);
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(()=> handleSearchInput(v), 120);
 });
 clearBtn.addEventListener('click',()=>{
   searchInput.value=''; clearBtn.style.display='none';
@@ -412,17 +421,27 @@ clearBtn.addEventListener('click',()=>{
   searchInput.focus();
 });
 
-// VIRTUAL LAZY LIST RENDERER FOR 21,032 VILLAGES
-function renderVillageBatch(){
-  const batch = filteredVillages.slice(0, villageDisplayCount);
-  villageList.innerHTML = '';
-  if(batch.length === 0 && villageData.length > 0){
+// INCREMENTAL LAZY LIST RENDERER
+let renderedVillageCount = 0;
+
+function renderVillageBatch(reset = false){
+  if (reset) {
+    villageList.innerHTML = '';
+    renderedVillageCount = 0;
+  }
+  
+  if (filteredVillages.length === 0 && villageData.length > 0) {
+    villageList.innerHTML = '';
     const li=document.createElement('li');
     li.className='no-results empty-state';
     li.innerHTML='<div class="big">🔍</div><p>No results for "<strong>'+esc(searchInput.value)+'</strong>"</p>';
     villageList.appendChild(li);
+    renderedVillageCount = 0;
     return;
   }
+
+  const batch = filteredVillages.slice(renderedVillageCount, villageDisplayCount);
+  if (batch.length === 0) return;
 
   const frag = document.createDocumentFragment();
   batch.forEach(item => {
@@ -435,13 +454,14 @@ function renderVillageBatch(){
     frag.appendChild(li);
   });
   villageList.appendChild(frag);
+  renderedVillageCount = villageDisplayCount;
 }
 
 panelV.addEventListener('scroll', () => {
   if (panelV.scrollTop + panelV.clientHeight >= panelV.scrollHeight - 120) {
     if (villageDisplayCount < filteredVillages.length) {
       villageDisplayCount += 60;
-      renderVillageBatch();
+      renderVillageBatch(false);
     }
   }
 });
@@ -451,16 +471,12 @@ function filterVillages(term){
   if(!q){
     filteredVillages = villageData;
   } else {
-    filteredVillages = villageData.filter(item =>
-      item.name.toLowerCase().includes(q) ||
-      item.sub.toLowerCase().includes(q) ||
-      item.district.toLowerCase().includes(q)
-    );
+    filteredVillages = villageData.filter(item => item._searchKey.includes(q));
   }
   villageDisplayCount = 80;
   vCount.textContent = q ? filteredVillages.length.toLocaleString() : villageData.length.toLocaleString();
   searchCount.textContent = q ? filteredVillages.length.toLocaleString()+' / '+villageData.length.toLocaleString() : '';
-  renderVillageBatch();
+  renderVillageBatch(true);
 }
 
 function filterDistricts(term){
@@ -606,11 +622,14 @@ function loadVillages(){
     .then(r=>{if(!r.ok) throw new Error('Village index failed');return r.json();})
     .then(rows=>{
       rows.forEach(r => {
+        let item;
         if (typeof r[0] === 'number') {
-          villageData.push({ id: r[0], name: r[1], sub: r[2], district: r[3], lat: r[4], lng: r[5] });
+          item = { id: r[0], name: r[1], sub: r[2], district: r[3], lat: r[4], lng: r[5] };
         } else {
-          villageData.push({ id: villageData.length, name: r[0], sub: r[1], district: r[2], lat: r[3], lng: r[4] });
+          item = { id: villageData.length, name: r[0], sub: r[1], district: r[2], lat: r[3], lng: r[4] };
         }
+        item._searchKey = `${item.name} ${item.sub||''} ${item.district||''}`.toLowerCase();
+        villageData.push(item);
       });
       villageData.sort((a,b)=>a.name.localeCompare(b.name));
       vCount.textContent=villageData.length.toLocaleString();
