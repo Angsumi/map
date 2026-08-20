@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Assam Village & District Portal — search 35 districts and 21,032 villages on an interactive OpenStreetMap." />
+  <meta name="description" content="Assam Village & District Portal — search 35 districts and 21,032 villages with exact boundary polygons." />
   <title>Assam Map Portal</title>
   <link rel="preconnect" href="https://tile.openstreetmap.org" />
   <link rel="preconnect" href="https://unpkg.com" />
@@ -173,7 +173,7 @@
   <a class="gh-link" href="https://github.com/Angsumi/map" target="_blank" rel="noreferrer">GitHub ↗</a>
 </header>
 
-<!-- controls: tabs + search -->
+<!-- always-visible controls: tabs + search -->
 <div class="controls">
   <div class="tab-bar" role="tablist">
     <button class="tab-btn active" id="tab-v" role="tab" aria-selected="true" aria-controls="panel-v">
@@ -226,8 +226,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 /* ============================================================
-   Assam Map Portal — Polygon Boundary Engine
-   Renders simplified polygon boundary of ONLY the clicked village / district
+   Assam Map Portal — Ultra-Fast Polygon Renderer
+   Renders exact simplified polygon boundary of ONLY clicked village/district
    =========================================================== */
 
 // INITIALIZE LEAFLET MAP WITH CANVAS ACCELERATION
@@ -241,7 +241,7 @@ const map = L.map('map', {
 });
 L.control.zoom({ position: 'topright' }).addTo(map);
 
-// OPENSTREETMAP TILE OPTIONS
+// OPENSTREETMAP TILE LAYERS
 const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   maxZoom: 19,
@@ -249,7 +249,7 @@ const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 });
 
 const osmHot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles by <a href="https://www.hotosm.org/">HOT</a>',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Style by <a href="https://www.hotosm.org/">HOT</a>',
   subdomains: 'abc',
   maxZoom: 19,
   keepBuffer: 4
@@ -287,8 +287,9 @@ L.control.layers({
 
 map.setView([26.2, 92.9], 7);
 
-const dStyle = { color: '#0a4f34', weight: 2.5, fillColor: '#3db87a', fillOpacity: .5 };
-const vPolyStyle = { color: '#b03000', weight: 2.5, fillColor: '#f05818', fillOpacity: .55 };
+// VIBRANT STYLES FOR POLYGONS
+const dStyle = { color: '#0a4f34', weight: 3, fillColor: '#23a46a', fillOpacity: .6 };
+const vPolyStyle = { color: '#b02000', weight: 3, fillColor: '#f05010', fillOpacity: .65 };
 
 // STATE
 let currentTab          = 'v';
@@ -297,10 +298,10 @@ let villageData         = [];   // [{id, name, sub, district, lat, lng}]
 let filteredVillages    = [];
 let villageDisplayCount = 80;
 let mobilePanelShown    = 'list';
-let activeVLayer        = null; // single village polygon layer
+let activeVLayer        = null; // single village polygon or marker layer
 let activeDLayer        = null; // single district polygon layer
 
-// CACHE FOR DISTRICT POLYGON JSON FILES
+// IN-MEMORY CACHE FOR DISTRICT POLYGONS
 const districtPolygonCache = new Map();
 
 // DOM
@@ -327,7 +328,7 @@ function setStatus(msg,done){statusText.textContent=msg;if(done)spinner.classLis
 const isMobile=()=>window.innerWidth<=768;
 
 function resizeMap(){
-  setTimeout(()=> map.invalidateSize(), 100);
+  setTimeout(()=> map.invalidateSize(), 80);
 }
 
 function popVillage(name,sub,district,lat,lng){
@@ -411,7 +412,7 @@ clearBtn.addEventListener('click',()=>{
   searchInput.focus();
 });
 
-// ULTRA-FAST VIRTUAL CHUNKED RENDER FOR 21,032 VILLAGES
+// VIRTUAL LAZY LIST RENDERER FOR 21,032 VILLAGES
 function renderVillageBatch(){
   const batch = filteredVillages.slice(0, villageDisplayCount);
   villageList.innerHTML = '';
@@ -488,14 +489,14 @@ function buildDistrictList(){
 }
 
 // FETCH & CACHE DISTRICT POLYGONS ON DEMAND
-function getVillagePolygon(districtName, villageId) {
+function getVillagePolygonData(districtName, villageId) {
   const slug = districtName.replace(/[^A-Z0-9]/g, '_');
   if (districtPolygonCache.has(slug)) {
     const dMap = districtPolygonCache.get(slug);
     return Promise.resolve(dMap[String(villageId)] || null);
   }
   return fetch('villages-data/' + slug + '.json')
-    .then(r => { if(!r.ok) throw new Error('Polygon load failed'); return r.json(); })
+    .then(r => { if(!r.ok) throw new Error('Polygon fetch error'); return r.json(); })
     .then(dMap => {
       districtPolygonCache.set(slug, dMap);
       return dMap[String(villageId)] || null;
@@ -503,40 +504,57 @@ function getVillagePolygon(districtName, villageId) {
     .catch(() => null);
 }
 
-// SHOW VILLAGE — RENDER ITS EXACT SIMPLIFIED POLYGON BOUNDARY
+// SHOW VILLAGE — RENDER INSTANT PIN THEN SWAP TO EXACT SIMPLIFIED POLYGON BOUNDARY
 function showVillage(item, btn){
   clearMap();
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
   if(btn) btn.classList.add('highlighted');
 
-  getVillagePolygon(item.district, item.id).then(vData => {
-    if(!vData || !vData.geom) {
-      // Fallback if polygon unavailable: show point marker
-      activeVLayer = L.circleMarker([item.lat, item.lng], {
-        radius: 9, color: '#8a2800', weight: 2.5, fillColor: '#e85010', fillOpacity: .95
-      }).addTo(map);
-      activeVLayer.bindPopup(popVillage(item.name, item.sub, item.district, item.lat, item.lng), { maxWidth: 240 });
-      map.setView([item.lat, item.lng], 14, { animate: true });
-      setTimeout(()=> { if(activeVLayer) activeVLayer.openPopup(); }, 100);
-      return;
-    }
+  // 1. Instant 0ms visual feedback marker
+  activeVLayer = L.circleMarker([item.lat, item.lng], {
+    radius: 9, color: '#b02000', weight: 2.5, fillColor: '#f05010', fillOpacity: .95
+  }).addTo(map);
+  activeVLayer.bindPopup(popVillage(item.name, item.sub, item.district, item.lat, item.lng), { maxWidth: 240 });
+  
+  map.setView([item.lat, item.lng], 14, { animate: true });
+  activeVLayer.openPopup();
 
-    // Render exact Village Polygon Boundary!
-    activeVLayer = L.geoJSON(vData.geom, { style: vPolyStyle }).addTo(map);
+  if(isMobile()) {
+    document.getElementById('show-map-btn').click();
+  }
+  resizeMap();
+
+  // 2. Fetch polygon boundary and swap into high-contrast polygon layer
+  getVillagePolygonData(item.district, item.id).then(rawItem => {
+    if(!rawItem || !rawItem[1]) return; // keep point marker if polygon absent
+
+    const typeCode = rawItem[0];
+    const coords = rawItem[1];
+    const geojsonGeom = {
+      type: typeCode === 0 ? 'Polygon' : 'MultiPolygon',
+      coordinates: coords
+    };
+
+    // Swap marker with Polygon boundary layer!
+    if (activeVLayer) map.removeLayer(activeVLayer);
+
+    activeVLayer = L.geoJSON(geojsonGeom, { style: vPolyStyle }).addTo(map);
     activeVLayer.bindPopup(popVillage(item.name, item.sub, item.district, item.lat, item.lng), { maxWidth: 240 });
-    
-    if(isMobile()) {
-      document.getElementById('show-map-btn').click();
-    }
-    resizeMap();
-    setTimeout(()=>{
-      map.fitBounds(activeVLayer.getBounds(), { padding: [40, 40], maxZoom: 15 });
-      if(activeVLayer) activeVLayer.openPopup();
-    }, 100);
+
+    try {
+      const polyBounds = activeVLayer.getBounds();
+      if (polyBounds.isValid()) {
+        map.fitBounds(polyBounds, { padding: [35, 35], maxZoom: 15 });
+      }
+    } catch(e) {}
+
+    setTimeout(() => {
+      if (activeVLayer) activeVLayer.openPopup();
+    }, 60);
   });
 }
 
-// SHOW DISTRICT — RENDER ITS EXACT BOUNDARY POLYGON
+// SHOW DISTRICT — RENDER ITS BOUNDARY POLYGON
 function showDistrict(item, btn){
   clearMap();
   document.querySelectorAll('.list-item-btn.highlighted').forEach(b=>b.classList.remove('highlighted'));
@@ -549,10 +567,17 @@ function showDistrict(item, btn){
     document.getElementById('show-map-btn').click();
   }
   resizeMap();
+
+  try {
+    const bounds = activeDLayer.getBounds();
+    if(bounds.isValid()){
+      map.fitBounds(bounds, { padding: [35, 35], maxZoom: 11 });
+    }
+  } catch(e){}
+
   setTimeout(()=>{
-    map.fitBounds(item.bounds, { padding: [40, 40], maxZoom: 11 });
     if(activeDLayer) activeDLayer.openPopup();
-  }, 100);
+  }, 60);
 }
 
 // LOAD DATA
@@ -581,7 +606,6 @@ function loadVillages(){
     .then(r=>{if(!r.ok) throw new Error('Village index failed');return r.json();})
     .then(rows=>{
       rows.forEach(r => {
-        // format: [id, name, sub, district, lat, lng] or [name, sub, district, lat, lng]
         if (typeof r[0] === 'number') {
           villageData.push({ id: r[0], name: r[1], sub: r[2], district: r[3], lat: r[4], lng: r[5] });
         } else {
