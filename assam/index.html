@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Assam Village & District Portal — search 35 districts and 21,032 villages with exact boundary polygons." />
   <title>Assam Map Portal</title>
-  <link rel="preconnect" href="https://tile.openstreetmap.org" />
-  <link rel="preconnect" href="https://unpkg.com" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ0kPjS8KQ2H5nQf1LL2jW9a7q1zv7M=" crossorigin="" />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <style>
     :root {
       color-scheme: light dark;
@@ -223,7 +222,7 @@
 
 </main>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 /* ============================================================
    Assam Map Portal — Ultra-Fast Polygon Renderer
@@ -236,7 +235,7 @@ const map = L.map('map', {
   scrollWheelZoom: true,
   preferCanvas: true,
   fadeAnimation: false,
-  zoomAnimation: true,
+  zoomAnimation: false,
   trackResize: true
 });
 L.control.zoom({ position: 'topright' }).addTo(map);
@@ -462,15 +461,14 @@ function renderVillageBatch(reset = false){
   const batch = filteredVillages.slice(renderedVillageCount, villageDisplayCount);
   if (batch.length === 0) return;
 
-  const frag = document.createDocumentFragment();
+  let html = '';
   for (let i = 0; i < batch.length; i++) {
     const item = batch[i];
     const globalIdx = renderedVillageCount + i;
-    const li = document.createElement('li');
-    li.innerHTML = '<button class="list-item-btn v-item" data-idx="'+globalIdx+'"><span class="dot"></span><span class="item-text"><span class="item-name">'+esc(item.name)+'</span><span class="item-meta">'+esc([item.sub,item.district].filter(Boolean).join(' · '))+'</span></span></button>';
-    frag.appendChild(li);
+    const meta = esc([item.sub, item.district].filter(Boolean).join(' · '));
+    html += '<li><button class="list-item-btn v-item" data-idx="'+globalIdx+'"><span class="dot"></span><span class="item-text"><span class="item-name">'+esc(item.name)+'</span><span class="item-meta">'+meta+'</span></span></button></li>';
   }
-  villageList.appendChild(frag);
+  villageList.insertAdjacentHTML('beforeend', html);
   renderedVillageCount = villageDisplayCount;
 }
 
