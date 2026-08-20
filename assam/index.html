@@ -3,447 +3,534 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Assam Village & District Portal — search and explore all 35 districts and 21,032 villages of Assam on an interactive map." />
-  <title>Assam Map Portal — Villages & Districts</title>
+  <meta name="description" content="Assam Village & District Portal — search 35 districts and 21,032 villages on an interactive map." />
+  <title>Assam Map Portal</title>
   <link rel="preconnect" href="https://unpkg.com" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIINfQ0kPjS8KQ2H5nQf1LL2jW9a7q1zv7M=" crossorigin="" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ0kPjS8KQ2H5nQf1LL2jW9a7q1zv7M=" crossorigin="" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="" />
   <style>
+    /* ── tokens ── */
     :root {
       color-scheme: light dark;
-      --bg:     #f2f5f0;
-      --panel:  #ffffff;
-      --ink:    #111c17;
-      --muted:  #4f6358;
-      --border: #d0dbd1;
-      --accent: #126a4a;
-      --accent2:#0b9960;
-      --soft:   #d8eee2;
-      --shadow: 0 4px 24px rgba(18,106,74,.10);
-      --radius: 14px;
+      --bg:      #f0f4ef;
+      --panel:   #ffffff;
+      --ink:     #101c16;
+      --muted:   #4e6357;
+      --border:  #cddacf;
+      --accent:  #126a4a;
+      --accentH: #0b9960;
+      --soft:    #d5ecdf;
+      --shadow:  0 2px 16px rgba(18,106,74,.10);
+      --r:       12px;
+      --topH:    56px;
+      --ctrlH:   112px; /* tabs(48) + search(64) */
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg:     #0f1a13; --panel:  #182318; --ink:    #e8f5eb;
-        --muted:  #8ab49a; --border: #2a3e30; --accent: #4fc98a;
-        --accent2:#34a86a; --soft:   #1c3626;
-        --shadow: 0 4px 24px rgba(0,0,0,.35);
+        --bg:     #0e1912; --panel:  #172318; --ink:    #e5f2e8;
+        --muted:  #87b097; --border: #273d2e; --accent: #3fc47e;
+        --accentH:#29a868; --soft:   #1b3424;
+        --shadow: 0 2px 16px rgba(0,0,0,.4);
       }
     }
-    *, *::before, *::after { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body { margin:0; background:var(--bg); color:var(--ink);
-           font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; line-height:1.5; }
-    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
-               overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { background: var(--bg); color: var(--ink);
+           font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+           display: flex; flex-direction: column; }
+    .sr-only { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
 
-    /* topbar */
-    .topbar { background:var(--panel); border-bottom:1px solid var(--border);
-              position:sticky; top:0; z-index:1000; box-shadow:0 1px 8px rgba(0,0,0,.07); }
-    .topbar-inner { max-width:1300px; margin:auto; padding:0 24px; height:60px;
-                    display:flex; align-items:center; justify-content:space-between; }
-    .brand { display:flex; align-items:center; gap:10px; text-decoration:none;
-             color:var(--ink); font-weight:800; font-size:1.05rem; letter-spacing:-.03em; }
-    .brand-icon { width:32px; height:32px; border-radius:9px; background:var(--accent);
-                  display:grid; place-items:center; }
-    .topbar-links { display:flex; gap:20px; font-size:.88rem; color:var(--muted); }
-    .topbar-links a { text-decoration:none; color:inherit; transition:color .15s; }
-    .topbar-links a:hover { color:var(--accent); }
+    /* ── topbar ── */
+    .topbar {
+      flex-shrink: 0;
+      height: var(--topH);
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
+      position: sticky; top: 0; z-index: 500;
+      box-shadow: 0 1px 6px rgba(0,0,0,.06);
+    }
+    .brand { display:flex; align-items:center; gap:9px; text-decoration:none;
+             color:var(--ink); font-weight:800; font-size:1rem; letter-spacing:-.03em; }
+    .brand-icon { width:30px; height:30px; border-radius:8px; background:var(--accent);
+                  display:grid; place-items:center; flex-shrink:0; }
+    .gh-link { font-size:.82rem; color:var(--muted); text-decoration:none; }
+    .gh-link:hover { color:var(--accent); }
 
-    /* hero */
-    .hero { max-width:1300px; margin:0 auto; padding:52px 24px 36px; text-align:center; }
-    .hero-badge { display:inline-block; font-size:.72rem; font-weight:700;
-                  letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin-bottom:14px; }
-    .hero h1 { margin:0 0 14px; font-size:clamp(2rem,5vw,3.2rem);
-               font-weight:900; letter-spacing:-.05em; line-height:1; }
-    .hero p { max-width:540px; margin:0 auto 28px; color:var(--muted); font-size:1rem; }
-    .hero-buttons { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:28px; }
-    .btn { display:inline-flex; align-items:center; gap:8px; padding:12px 24px;
-           border-radius:var(--radius); font-size:.95rem; font-weight:700; cursor:pointer;
-           border:none; text-decoration:none; transition:transform .18s, box-shadow .18s; }
-    .btn:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
-    .btn:active { transform:translateY(0); }
-    .btn-primary { background:var(--accent); color:#fff; }
-    .btn-primary:hover { background:var(--accent2); }
-    .btn-secondary { background:var(--panel); color:var(--ink); border:1.5px solid var(--border); }
+    /* ── controls bar (tabs + search) ── */
+    .controls {
+      flex-shrink: 0;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      position: sticky; top: var(--topH); z-index: 400;
+    }
+    /* tabs row */
+    .tab-bar { display:flex; border-bottom:1px solid var(--border); }
+    .tab-btn {
+      flex: 1; height: 48px;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      font: inherit; font-size: .9rem; font-weight: 700;
+      background: transparent; border: none;
+      color: var(--muted); cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .tab-btn .tab-count { font-size:.75rem; font-weight:500;
+                          background:var(--soft); color:var(--accent);
+                          padding:2px 7px; border-radius:20px; }
+    .tab-btn.active { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb,var(--accent) 5%,transparent); }
+    .tab-btn:hover:not(.active) { color: var(--ink); background: var(--bg); }
 
-    /* stats */
-    .stats { display:flex; justify-content:center; max-width:380px; margin:0 auto 40px;
-             border:1px solid var(--border); border-radius:var(--radius);
-             overflow:hidden; background:var(--panel); }
-    .stat { flex:1; padding:13px 14px; text-align:center; border-right:1px solid var(--border); }
-    .stat:last-child { border-right:none; }
-    .stat strong { display:block; font-size:1.3rem; font-weight:800; color:var(--accent); }
-    .stat span { font-size:.76rem; color:var(--muted); }
+    /* search row */
+    .search-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px;
+    }
+    .search-wrap {
+      flex: 1; position: relative;
+    }
+    .search-icon {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      color: var(--muted); pointer-events: none; font-size: 1rem;
+    }
+    #search-input {
+      width: 100%; padding: 10px 12px 10px 36px;
+      border: 1.5px solid var(--border); border-radius: var(--r);
+      background: var(--bg); color: var(--ink);
+      font: inherit; font-size: .93rem;
+      outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    #search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+    }
+    #search-input::placeholder { color: var(--muted); }
+    #clear-btn {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; color: var(--muted);
+      font-size: 1rem; line-height: 1; padding: 2px; display: none;
+    }
+    #clear-btn:hover { color: var(--ink); }
+    #search-count { font-size:.76rem; color:var(--muted); white-space:nowrap; }
 
-    /* portal layout */
-    #portal { max-width:1300px; margin:0 auto; padding:0 24px 64px; }
-    .portal-grid { display:grid; grid-template-columns:1fr 340px;
-                   border:1px solid var(--border); border-radius:var(--radius);
-                   overflow:hidden; box-shadow:var(--shadow); background:var(--panel); min-height:640px; }
-    @media (max-width:860px) { .portal-grid { grid-template-columns:1fr; } }
+    /* mobile view toggle */
+    .view-toggle {
+      display: none;
+      gap: 0;
+      border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden;
+      flex-shrink: 0;
+    }
+    .view-btn {
+      padding: 7px 12px; font: inherit; font-size: .82rem; font-weight: 700;
+      background: transparent; border: none; cursor: pointer; color: var(--muted);
+      transition: background .13s, color .13s;
+    }
+    .view-btn.active { background: var(--accent); color: #fff; }
+    @media (max-width: 768px) { .view-toggle { display: flex; } }
 
-    /* map */
-    #map { min-height:640px; background:#e4ece6; }
+    /* ── main split layout ── */
+    .portal {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      min-height: 0;           /* allow grid children to scroll */
+    }
+    @media (max-width: 768px) {
+      .portal { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+    }
 
-    /* sidebar */
-    .sidebar { border-left:1px solid var(--border); display:flex;
-               flex-direction:column; max-height:640px; overflow:hidden; }
-    @media (max-width:860px) { .sidebar { max-height:420px; border-left:none; border-top:1px solid var(--border); } }
+    /* list pane */
+    .list-pane {
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      background: var(--panel);
+      overflow: hidden;
+      min-height: 0;
+    }
+    @media (max-width: 768px) {
+      .list-pane { border-right: none; border-bottom: 1px solid var(--border); }
+      .list-pane.mobile-hidden { display: none; }
+    }
 
-    /* tabs */
-    .tab-bar { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
-    .tab-btn { flex:1; padding:14px 10px; font:inherit; font-size:.88rem; font-weight:700;
-               background:transparent; border:none; color:var(--muted); cursor:pointer;
-               border-bottom:2.5px solid transparent; transition:color .15s, border-color .15s; }
-    .tab-btn.active { color:var(--accent); border-color:var(--accent); }
-    .tab-btn:hover:not(.active) { color:var(--ink); }
+    .list-scroll { flex: 1; overflow-y: auto; }
+    .list-scroll::-webkit-scrollbar { width: 4px; }
+    .list-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-    /* search */
-    .search-box { padding:12px 14px; border-bottom:1px solid var(--border); flex-shrink:0; }
-    .search-box input { width:100%; padding:9px 12px; border:1px solid var(--border);
-                        border-radius:8px; background:var(--bg); color:var(--ink);
-                        font:inherit; font-size:.88rem; outline:none;
-                        transition:border-color .15s, box-shadow .15s; }
-    .search-box input:focus { border-color:var(--accent);
-                              box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
-    .search-count { margin-top:6px; font-size:.76rem; color:var(--muted); }
+    /* empty state */
+    .empty-state { padding: 40px 24px; text-align: center; color: var(--muted); }
+    .empty-state .big { font-size: 2rem; margin-bottom: 8px; }
+    .empty-state p { font-size: .88rem; }
 
-    /* lists */
-    .list-panel { flex:1; overflow-y:auto; display:none; }
-    .list-panel.active { display:block; }
-    .list-panel ul { margin:0; padding:0; list-style:none; }
-    .list-panel li button { display:block; width:100%; text-align:left; padding:10px 14px;
-                            background:none; border:none; border-bottom:1px solid var(--border);
-                            font:inherit; font-size:.85rem; color:var(--ink);
-                            cursor:pointer; transition:background .13s; line-height:1.35; }
-    .list-panel li button:hover { background:var(--soft); }
-    .list-panel li button.highlighted { background:var(--soft); color:var(--accent); }
-    .item-name { font-weight:700; display:block; }
-    .item-meta { font-size:.76rem; color:var(--muted); }
+    /* list items */
+    .list-ul { list-style: none; }
+    .list-item-btn {
+      display: flex; align-items: center; gap: 12px;
+      width: 100%; text-align: left;
+      padding: 12px 16px;
+      background: none; border: none; border-bottom: 1px solid var(--border);
+      font: inherit; color: var(--ink); cursor: pointer;
+      transition: background .12s;
+    }
+    .list-item-btn:hover { background: var(--soft); }
+    .list-item-btn.highlighted { background: var(--soft); }
+    .list-item-btn .dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+      background: var(--accent);
+    }
+    .list-item-btn.v-item .dot { background: #d05010; }
+    .item-text { min-width: 0; }
+    .item-name { font-weight: 700; font-size: .9rem; display: block;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-meta { font-size: .75rem; color: var(--muted); display: block;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* status bar */
-    .sidebar-status { padding:9px 14px; font-size:.76rem; color:var(--muted);
-                      border-top:1px solid var(--border); flex-shrink:0; }
-    .loading-bar { height:3px; background:var(--soft); border-radius:2px; overflow:hidden; margin:5px 0 0; }
-    .loading-bar-fill { height:100%; background:var(--accent); animation:indeterminate 1.4s infinite; }
-    @keyframes indeterminate { 0%{width:0;margin-left:0} 50%{width:60%;margin-left:20%} 100%{width:0;margin-left:100%} }
-    .loading-bar.done .loading-bar-fill { animation:none; width:100%; }
+    /* list footer status */
+    .list-status { padding: 10px 16px; font-size: .75rem; color: var(--muted);
+                   border-top: 1px solid var(--border); flex-shrink: 0;
+                   display: flex; align-items: center; gap: 8px; }
+    .spinner { width: 14px; height: 14px; border: 2px solid var(--border);
+               border-top-color: var(--accent); border-radius: 50%;
+               animation: spin .7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner.done { display: none; }
 
-    /* cluster override colours */
-    .marker-cluster-small  { background-color:rgba(176,64,0,.55); }
-    .marker-cluster-small div  { background-color:rgba(176,64,0,.75); }
-    .marker-cluster-medium { background-color:rgba(200,80,0,.55); }
-    .marker-cluster-medium div { background-color:rgba(200,80,0,.75); }
-    .marker-cluster-large  { background-color:rgba(220,100,0,.55); }
-    .marker-cluster-large div  { background-color:rgba(220,100,0,.75); }
-    .marker-cluster div { color:#fff; font-weight:700; }
+    /* map pane */
+    #map-pane {
+      position: relative;
+      min-height: 0;
+    }
+    @media (max-width: 768px) {
+      #map-pane { min-height: 55vw; }
+      #map-pane.mobile-hidden { display: none; }
+    }
+    #map { width: 100%; height: 100%; background: #dce8dd; }
 
-    /* popups */
-    .pop-name { font-weight:800; font-size:.96rem; margin:0 0 4px; }
-    .pop-meta  { color:#526359; margin:0 0 6px; font-size:.82rem; }
-    .pop-actions { display:flex; gap:7px; flex-wrap:wrap; }
-    .pop-link { display:inline-flex; align-items:center; gap:4px; font-size:.77rem;
-                font-weight:700; padding:4px 8px; border-radius:6px; text-decoration:none;
-                background:#d8eee2; color:#126a4a; transition:background .15s; }
-    .pop-link:hover { background:#b8decc; }
+    /* ── popup ── */
+    .leaflet-popup-content { margin: 12px 14px; }
+    .pop-name { font-weight: 800; font-size: .96rem; margin-bottom: 4px; }
+    .pop-meta  { color: var(--muted,#526359); font-size: .8rem; margin-bottom: 8px; }
+    .pop-links { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pop-link  {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: .77rem; font-weight: 700;
+      padding: 4px 9px; border-radius: 6px; text-decoration: none;
+      background: #d5ecdf; color: #126a4a;
+    }
+    .pop-link:hover { background: #b5dcca; }
 
-    footer { text-align:center; padding:24px; font-size:.82rem; color:var(--muted);
-             border-top:1px solid var(--border); }
-    .list-panel::-webkit-scrollbar { width:4px; }
-    .list-panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:9px; }
-    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; animation:none!important; } }
+    /* cluster colours */
+    .marker-cluster-small  { background-color:rgba(200,70,0,.45); }
+    .marker-cluster-small div  { background-color:rgba(200,70,0,.7); color:#fff; font-weight:700; }
+    .marker-cluster-medium { background-color:rgba(210,90,0,.45); }
+    .marker-cluster-medium div { background-color:rgba(210,90,0,.7); color:#fff; font-weight:700; }
+    .marker-cluster-large  { background-color:rgba(220,100,0,.45); }
+    .marker-cluster-large div  { background-color:rgba(220,100,0,.7); color:#fff; font-weight:700; }
   </style>
 </head>
 <body>
 
-<div class="topbar">
-  <div class="topbar-inner">
-    <a class="brand" href="#">
-      <span class="brand-icon">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white"
-             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-          <circle cx="12" cy="9" r="2.5" fill="white" stroke="none"/>
-        </svg>
-      </span>
-      Assam Map Portal
-    </a>
-    <div class="topbar-links">
-      <a href="#portal">Explore</a>
-      <a href="https://github.com/Angsumi/map" target="_blank" rel="noreferrer">GitHub</a>
+<!-- ── TOPBAR ── -->
+<header class="topbar">
+  <a class="brand" href="#">
+    <span class="brand-icon">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <circle cx="12" cy="9" r="2.5" fill="white" stroke="none"/>
+      </svg>
+    </span>
+    Assam Map Portal
+  </a>
+  <a class="gh-link" href="https://github.com/Angsumi/map" target="_blank" rel="noreferrer">GitHub ↗</a>
+</header>
+
+<!-- ── CONTROLS (tabs + search, sticky) ── -->
+<div class="controls">
+  <div class="tab-bar" role="tablist">
+    <button class="tab-btn active" id="tab-v" role="tab" aria-selected="true" aria-controls="panel-v">
+      🏘️ Villages <span class="tab-count" id="v-count">21,032</span>
+    </button>
+    <button class="tab-btn" id="tab-d" role="tab" aria-selected="false" aria-controls="panel-d">
+      🗺️ Districts <span class="tab-count" id="d-count">35</span>
+    </button>
+  </div>
+  <div class="search-row">
+    <div class="search-wrap">
+      <span class="search-icon" aria-hidden="true">🔍</span>
+      <input id="search-input" type="search" placeholder="Search villages by name, sub-district or district…"
+             autocomplete="off" spellcheck="false" aria-label="Search" />
+      <button id="clear-btn" aria-label="Clear search" title="Clear">✕</button>
+    </div>
+    <span id="search-count" aria-live="polite"></span>
+    <!-- mobile map/list toggle -->
+    <div class="view-toggle" role="group" aria-label="Toggle view">
+      <button class="view-btn" id="show-map-btn" aria-pressed="false">Map</button>
+      <button class="view-btn active" id="show-list-btn" aria-pressed="true">List</button>
     </div>
   </div>
 </div>
 
-<section class="hero" id="top">
-  <p class="hero-badge">Geographic Reference &middot; Assam, India</p>
-  <h1>Explore Every Village &amp; District</h1>
-  <p>Search, locate and navigate all 35 districts and 21,032 villages of Assam on a live interactive map.</p>
-  <div class="hero-buttons">
-    <a class="btn btn-primary"   href="#portal" id="hero-villages">&#127968; Browse Villages</a>
-    <a class="btn btn-secondary" href="#portal" id="hero-districts">&#128506; Browse Districts</a>
-  </div>
-  <div class="stats">
-    <div class="stat"><strong>35</strong><span>Districts</span></div>
-    <div class="stat"><strong>21,032</strong><span>Villages</span></div>
-    <div class="stat"><strong>33</strong><span>Sub-districts</span></div>
-  </div>
-</section>
+<!-- ── MAIN SPLIT ── -->
+<main class="portal">
 
-<section id="portal">
-  <div class="portal-grid">
-    <div id="map" aria-label="Interactive map of Assam"></div>
-    <aside class="sidebar" aria-label="Search panel">
-      <div class="tab-bar" role="tablist">
-        <button class="tab-btn active" id="tab-villages" role="tab"
-                aria-selected="true"  aria-controls="panel-villages">&#127968; Villages</button>
-        <button class="tab-btn"        id="tab-districts" role="tab"
-                aria-selected="false" aria-controls="panel-districts">&#128506; Districts</button>
-      </div>
-      <div class="search-box">
-        <label class="sr-only" for="search-input">Search</label>
-        <input id="search-input" type="search" placeholder="Search villages..."
-               autocomplete="off" spellcheck="false" />
-        <div class="search-count" id="search-count" aria-live="polite"></div>
-      </div>
-      <div class="list-panel active" id="panel-villages" role="tabpanel" aria-labelledby="tab-villages">
-        <ul id="village-list" aria-label="Village list">
-          <li><button disabled style="color:var(--muted);cursor:default;pointer-events:none;">Loading villages...</button></li>
-        </ul>
-      </div>
-      <div class="list-panel" id="panel-districts" role="tabpanel" aria-labelledby="tab-districts">
-        <ul id="district-list" aria-label="District list"></ul>
-      </div>
-      <div class="sidebar-status" aria-live="polite">
-        <span id="status-text">Initialising...</span>
-        <div class="loading-bar" id="loading-bar"><div class="loading-bar-fill"></div></div>
-      </div>
-    </aside>
+  <!-- LIST PANE -->
+  <div class="list-pane" id="list-pane">
+
+    <!-- Villages panel -->
+    <div class="list-scroll" id="panel-v" role="tabpanel" aria-labelledby="tab-v">
+      <ul class="list-ul" id="village-list" aria-label="Village list">
+        <li class="empty-state"><div class="big">⏳</div><p>Loading villages…</p></li>
+      </ul>
+    </div>
+
+    <!-- Districts panel -->
+    <div class="list-scroll" id="panel-d" role="tabpanel" aria-labelledby="tab-d" hidden>
+      <ul class="list-ul" id="district-list" aria-label="District list"></ul>
+    </div>
+
+    <!-- status bar -->
+    <div class="list-status">
+      <div class="spinner" id="spinner"></div>
+      <span id="status-text">Loading…</span>
+    </div>
   </div>
-</section>
 
-<footer>
-  Data: Assam district &amp; village boundary datasets &middot;
-  Tiles &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors &middot;
-  <a href="https://leafletjs.com" target="_blank" rel="noreferrer">Leaflet</a>
-</footer>
+  <!-- MAP PANE -->
+  <div id="map-pane" class="mobile-hidden">
+    <div id="map"></div>
+  </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
 <script>
-/* =============================================================
-   Assam Map Portal  –  assam/index.html
-   Data files (one level up, repo root):
-     ../districts-simple.geojson   – 35 simplified district polys
-     villages-slim.json            – 21 032 slim village records
-   ============================================================= */
+/* ============================================================
+   Assam Map Portal  —  assam/index.html
+   =========================================================== */
 
-const BASE = '../';
-
-// ── MAP ───────────────────────────────────────────────────────
-const map = L.map('map', { zoomControl:false, scrollWheelZoom:false });
-L.control.zoom({ position:'bottomright' }).addTo(map);
+// ── MAP INIT ──────────────────────────────────────────────
+const map = L.map('map', { zoomControl:false, scrollWheelZoom:true });
+L.control.zoom({ position:'topright' }).addTo(map);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   maxZoom:19,
 }).addTo(map);
 map.setView([26.2, 92.9], 7);
 
-// ── STYLES ────────────────────────────────────────────────────
-const dStyle   = { color:'#1a6b4a', weight:1.5, fillColor:'#7ecba0', fillOpacity:.55 };
-const dHiStyle = { color:'#0a4f34', weight:2.5, fillColor:'#3db87a', fillOpacity:.82 };
+// ── STYLES ────────────────────────────────────────────────
+const dStyle   = {color:'#1a6b4a',weight:1.5,fillColor:'#7ecba0',fillOpacity:.55};
+const dHiStyle = {color:'#0a4f34',weight:2.5,fillColor:'#3db87a',fillOpacity:.82};
 
-// ── STATE ─────────────────────────────────────────────────────
-let districtGeoLayer  = null;   // L.geoJSON layer
-let villageCluster    = null;   // L.markerClusterGroup
-let districtData      = [];     // [{name, layer, bounds}]
-let villageData       = [];     // [{name, sub, district, lat, lng, marker}]
-let activeDistName    = null;
-let currentTab        = 'villages';
-let villagesLoaded    = false;
-let districtsLoaded   = false;
+// ── STATE ─────────────────────────────────────────────────
+let currentTab       = 'v';
+let districtData     = [];   // [{name, layer, bounds}]
+let villageData      = [];   // [{name, sub, district, lat, lng, marker}]
+let districtGeoLayer = null;
+let villageCluster   = null;
+let activeDistName   = null;
+let mobilePanelShown = 'list'; // 'list' | 'map'
 
-// ── DOM ───────────────────────────────────────────────────────
+// ── DOM ───────────────────────────────────────────────────
 const searchInput  = document.getElementById('search-input');
+const clearBtn     = document.getElementById('clear-btn');
 const searchCount  = document.getElementById('search-count');
 const villageList  = document.getElementById('village-list');
 const districtList = document.getElementById('district-list');
+const panelV       = document.getElementById('panel-v');
+const panelD       = document.getElementById('panel-d');
 const statusText   = document.getElementById('status-text');
-const loadingBar   = document.getElementById('loading-bar');
+const spinner      = document.getElementById('spinner');
+const listPane     = document.getElementById('list-pane');
+const mapPane      = document.getElementById('map-pane');
+const vCount       = document.getElementById('v-count');
+const dCount       = document.getElementById('d-count');
 
-// ── HELPERS ───────────────────────────────────────────────────
+// ── HELPERS ───────────────────────────────────────────────
 function esc(s){ return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function gmVillage(lat,lng){ return 'https://www.google.com/maps?q='+lat+','+lng+'&z=14'; }
-function gmDistrict(name)  { return 'https://www.google.com/maps/search/'+encodeURIComponent(name+' district Assam India'); }
-function osmUrl(lat,lng)   { return 'https://www.openstreetmap.org/?mlat='+lat+'&mlon='+lng+'&zoom=14'; }
+function gmV(lat,lng){ return 'https://www.google.com/maps?q='+lat+','+lng+'&z=14'; }
+function gmD(name)   { return 'https://www.google.com/maps/search/'+encodeURIComponent(name+' district Assam India'); }
+function osm(lat,lng){ return 'https://www.openstreetmap.org/?mlat='+lat+'&mlon='+lng+'&zoom=15'; }
 
-function setStatus(msg, done){ statusText.textContent=msg; if(done) loadingBar.classList.add('done'); }
-
-function villagePopupHTML(name, sub, district, lat, lng){
-  const meta = [sub, district].filter(Boolean).join(', ');
-  return '<div><p class="pop-name">'+esc(name)+'</p>'
-    +(meta?'<p class="pop-meta">'+esc(meta)+'</p>':'')
-    +'<div class="pop-actions">'
-    +'<a class="pop-link" href="'+gmVillage(lat,lng)+'" target="_blank" rel="noreferrer">&#128205; Google Maps</a>'
-    +'<a class="pop-link" href="'+osmUrl(lat,lng)+'" target="_blank" rel="noreferrer">&#128506; OpenStreetMap</a>'
-    +'</div></div>';
-}
-function districtPopupHTML(name){
-  return '<div><p class="pop-name">'+esc(name)+'</p>'
-    +'<p class="pop-meta">District &middot; Assam</p>'
-    +'<div class="pop-actions">'
-    +'<a class="pop-link" href="'+gmDistrict(name)+'" target="_blank" rel="noreferrer">&#128205; Google Maps</a>'
-    +'</div></div>';
+function setStatus(msg, done){
+  statusText.textContent = msg;
+  if(done){ spinner.classList.add('done'); }
 }
 
-// ── LAYER VISIBILITY ──────────────────────────────────────────
-function showDistrictLayer(){
-  if(districtGeoLayer && !map.hasLayer(districtGeoLayer)) districtGeoLayer.addTo(map);
+function villagePopup(name,sub,district,lat,lng){
+  const meta=[sub,district].filter(Boolean).join(', ');
+  return '<div class="pop-name">'+esc(name)+'</div>'
+    +(meta?'<div class="pop-meta">'+esc(meta)+'</div>':'')
+    +'<div class="pop-links">'
+    +'<a class="pop-link" href="'+gmV(lat,lng)+'" target="_blank" rel="noreferrer">📍 Google Maps</a>'
+    +'<a class="pop-link" href="'+osm(lat,lng)+'" target="_blank" rel="noreferrer">🗺 OpenStreetMap</a>'
+    +'</div>';
 }
-function hideDistrictLayer(){
-  if(districtGeoLayer && map.hasLayer(districtGeoLayer)) map.removeLayer(districtGeoLayer);
-}
-function showVillageLayer(){
-  if(villageCluster && !map.hasLayer(villageCluster)) villageCluster.addTo(map);
-}
-function hideVillageLayer(){
-  if(villageCluster && map.hasLayer(villageCluster)) map.removeLayer(villageCluster);
+function districtPopup(name){
+  return '<div class="pop-name">'+esc(name)+'</div>'
+    +'<div class="pop-meta">District · Assam</div>'
+    +'<div class="pop-links"><a class="pop-link" href="'+gmD(name)+'" target="_blank" rel="noreferrer">📍 Google Maps</a></div>';
 }
 
-// ── TAB SWITCHING ─────────────────────────────────────────────
+// ── LAYER VISIBILITY ──────────────────────────────────────
+function showLayer(layer){ if(layer && !map.hasLayer(layer)) layer.addTo(map); }
+function hideLayer(layer){ if(layer && map.hasLayer(layer)) map.removeLayer(layer); }
+
+// ── MOBILE VIEW TOGGLE ────────────────────────────────────
+const isMobile = () => window.innerWidth <= 768;
+
+document.getElementById('show-map-btn').addEventListener('click', ()=>{
+  mobilePanelShown = 'map';
+  document.getElementById('show-map-btn').classList.add('active');
+  document.getElementById('show-list-btn').classList.remove('active');
+  listPane.classList.add('mobile-hidden');
+  mapPane.classList.remove('mobile-hidden');
+  map.invalidateSize();
+});
+document.getElementById('show-list-btn').addEventListener('click', ()=>{
+  mobilePanelShown = 'list';
+  document.getElementById('show-list-btn').classList.add('active');
+  document.getElementById('show-map-btn').classList.remove('active');
+  mapPane.classList.add('mobile-hidden');
+  listPane.classList.remove('mobile-hidden');
+});
+
+// On desktop, always show both
+window.addEventListener('resize', ()=>{
+  if(!isMobile()){
+    listPane.classList.remove('mobile-hidden');
+    mapPane.classList.remove('mobile-hidden');
+  } else {
+    if(mobilePanelShown==='map'){
+      listPane.classList.add('mobile-hidden');
+      mapPane.classList.remove('mobile-hidden');
+    } else {
+      mapPane.classList.add('mobile-hidden');
+      listPane.classList.remove('mobile-hidden');
+    }
+  }
+});
+
+// ── TAB SWITCHING ─────────────────────────────────────────
 function switchTab(tab){
   currentTab = tab;
-  const iv = tab === 'villages';
-  document.getElementById('tab-villages').classList.toggle('active', iv);
-  document.getElementById('tab-districts').classList.toggle('active', !iv);
-  document.getElementById('tab-villages').setAttribute('aria-selected', iv);
-  document.getElementById('tab-districts').setAttribute('aria-selected', !iv);
-  document.getElementById('panel-villages').classList.toggle('active', iv);
-  document.getElementById('panel-districts').classList.toggle('active', !iv);
-  searchInput.placeholder = iv ? 'Search villages...' : 'Search districts...';
+  const isV = tab === 'v';
+  document.getElementById('tab-v').classList.toggle('active', isV);
+  document.getElementById('tab-d').classList.toggle('active', !isV);
+  document.getElementById('tab-v').setAttribute('aria-selected', isV);
+  document.getElementById('tab-d').setAttribute('aria-selected', !isV);
+  panelV.hidden  = !isV;
+  panelD.hidden  =  isV;
+  searchInput.placeholder = isV
+    ? 'Search villages by name, sub-district or district…'
+    : 'Search districts…';
   searchInput.value = '';
+  clearBtn.style.display = 'none';
 
-  if(iv){
-    // Village tab: show villages, hide districts
-    showVillageLayer();
-    hideDistrictLayer();
-    if(villagesLoaded) renderVillageList('');
+  if(isV){
+    showLayer(villageCluster);
+    hideLayer(districtGeoLayer);
+    renderVillageList('');
   } else {
-    // District tab: show districts, hide villages
-    hideVillageLayer();
-    showDistrictLayer();
-    if(districtsLoaded) renderDistrictList('');
+    showLayer(districtGeoLayer);
+    hideLayer(villageCluster);
+    renderDistrictList('');
+  }
+
+  // On mobile, when switching tabs auto-jump to list view to see results
+  if(isMobile() && mobilePanelShown === 'map'){
+    document.getElementById('show-list-btn').click();
   }
 }
 
-document.getElementById('tab-villages').addEventListener('click', () => switchTab('villages'));
-document.getElementById('tab-districts').addEventListener('click', () => switchTab('districts'));
-document.getElementById('hero-villages').addEventListener('click', () => setTimeout(() => switchTab('villages'), 80));
-document.getElementById('hero-districts').addEventListener('click', () => setTimeout(() => switchTab('districts'), 80));
+document.getElementById('tab-v').addEventListener('click', ()=>switchTab('v'));
+document.getElementById('tab-d').addEventListener('click', ()=>switchTab('d'));
 
-// ── LOAD DISTRICTS ────────────────────────────────────────────
-function loadDistricts(){
-  setStatus('Loading districts...');
-  fetch(BASE + 'districts-simple.geojson')
-    .then(r=>{ if(!r.ok) throw new Error('District data failed.'); return r.json(); })
-    .then(data=>{
-      districtGeoLayer = L.geoJSON(data, {
-        style: dStyle,
-        onEachFeature(feature, layer){
-          const name = feature.properties.name;
-          layer.bindPopup(districtPopupHTML(name), { maxWidth:240 });
-          layer.on({
-            mouseover(){ if(activeDistName!==name) layer.setStyle(dHiStyle); },
-            mouseout() { if(activeDistName!==name) layer.setStyle(dStyle); },
-            click()    { selectDistrict(name, true); },
-          });
-          districtData.push({ name, layer, bounds:layer.getBounds() });
-        }
-      });
-      // Don't add to map yet — village tab is default, districts stay hidden
-      districtData.sort((a,b)=>a.name.localeCompare(b.name));
-      buildDistrictList();
-      districtsLoaded = true;
-      setStatus('Districts ready. Loading villages...');
-      loadVillages();
-    })
-    .catch(err=>setStatus('Error: '+err.message));
-}
+// ── SEARCH ────────────────────────────────────────────────
+searchInput.addEventListener('input', e=>{
+  const val = e.target.value;
+  clearBtn.style.display = val ? 'block' : 'none';
+  if(currentTab==='v') renderVillageList(val);
+  else renderDistrictList(val);
+});
+clearBtn.addEventListener('click', ()=>{
+  searchInput.value = '';
+  clearBtn.style.display = 'none';
+  if(currentTab==='v') renderVillageList('');
+  else renderDistrictList('');
+  searchInput.focus();
+});
 
-function selectDistrict(name, zoom){
-  if(activeDistName){
-    const prev = districtData.find(d=>d.name===activeDistName);
-    if(prev) prev.layer.setStyle(dStyle);
+// ── RENDER LISTS ──────────────────────────────────────────
+function renderVillageList(term){
+  const q = term.toLowerCase().trim();
+  let shown = 0;
+  const items = villageList.querySelectorAll('li');
+  items.forEach((li,i)=>{
+    const item = villageData[i];
+    if(!item){ li.hidden=true; return; }
+    const match = !q
+      || item.name.toLowerCase().includes(q)
+      || item.sub.toLowerCase().includes(q)
+      || item.district.toLowerCase().includes(q);
+    li.hidden = !match;
+    if(match) shown++;
+  });
+  const total = villageData.length;
+  vCount.textContent = q ? shown.toLocaleString() : total.toLocaleString();
+  searchCount.textContent = q
+    ? shown.toLocaleString()+' / '+total.toLocaleString()
+    : '';
+
+  // Show empty state if no results
+  if(total > 0){
+    const emptyEl = villageList.querySelector('.empty-state');
+    if(emptyEl) emptyEl.remove();
+    const noRes = villageList.querySelector('.no-results');
+    if(shown === 0 && q){
+      if(!noRes){
+        const li = document.createElement('li');
+        li.className = 'no-results empty-state';
+        li.innerHTML = '<div class="big">🔍</div><p>No villages found for "<strong>'+esc(q)+'</strong>"</p>';
+        villageList.appendChild(li);
+      }
+    } else {
+      if(noRes) noRes.remove();
+    }
   }
-  activeDistName = name;
-  const item = districtData.find(d=>d.name===name);
-  if(!item) return;
-  item.layer.setStyle(dHiStyle);
-  if(zoom){ map.fitBounds(item.bounds,{padding:[30,30],maxZoom:11}); item.layer.openPopup(); }
-  districtList.querySelectorAll('button').forEach(b=>b.classList.toggle('highlighted', b.dataset.name===name));
 }
 
-// ── LOAD VILLAGES (slim JSON + MarkerCluster) ─────────────────
-function loadVillages(){
-  setStatus('Loading villages...');
-  // villages-slim.json lives in assam/ (same dir as this file)
-  fetch('villages-slim.json')
-    .then(r=>{ if(!r.ok) throw new Error('Village data failed.'); return r.json(); })
-    .then(rows=>{
-      villageCluster = L.markerClusterGroup({
-        chunkedLoading:true,
-        chunkInterval:200,
-        chunkDelay:50,
-        maxClusterRadius:60,
-        showCoverageOnHover:false,
-        zoomToBoundsOnClick:true,
-      });
-
-      rows.forEach(([name, sub, district, lat, lng])=>{
-        const marker = L.circleMarker([lat, lng], {
-          radius:5, color:'#b04000', weight:1,
-          fillColor:'#f07030', fillOpacity:.88,
-        });
-        marker.bindPopup(villagePopupHTML(name,sub,district,lat,lng), { maxWidth:240 });
-        villageCluster.addLayer(marker);
-        villageData.push({ name, sub, district, lat, lng, marker });
-      });
-
-      // Village tab is active by default — add to map
-      if(currentTab === 'villages') villageCluster.addTo(map);
-
-      villageData.sort((a,b)=>a.name.localeCompare(b.name));
-      buildVillageList();
-      villagesLoaded = true;
-      setStatus(villageData.length.toLocaleString()+' villages loaded', true);
-      renderVillageList('');
-    })
-    .catch(err=>setStatus('Error: '+err.message, true));
+function renderDistrictList(term){
+  const q = term.toLowerCase().trim();
+  let shown = 0;
+  districtList.querySelectorAll('li').forEach(li=>{
+    const name = li.dataset.name || '';
+    const match = !q || name.toLowerCase().includes(q);
+    li.hidden = !match;
+    if(match) shown++;
+  });
+  const total = districtData.length;
+  dCount.textContent = q ? shown : total;
+  searchCount.textContent = q ? shown+' / '+total : '';
 }
 
-function flyToVillage(item){
-  // Switch to village tab if not already there (safety)
-  if(currentTab !== 'villages') switchTab('villages');
-  map.setView([item.lat, item.lng], 15, { animate:true });
-  // Open popup after brief delay so cluster has time to spiderfy
-  setTimeout(()=>{ item.marker.openPopup(); }, 350);
-}
-
-// ── BUILD SIDEBAR LISTS ───────────────────────────────────────
+// ── BUILD LISTS ───────────────────────────────────────────
 function buildVillageList(){
   villageList.innerHTML = '';
   const frag = document.createDocumentFragment();
   villageData.forEach((item, i)=>{
     const li  = document.createElement('li');
+    li.dataset.index = i;
     const btn = document.createElement('button');
-    btn.dataset.index = i;
-    btn.innerHTML = '<span class="item-name">'+esc(item.name)+'</span>'
-      +'<span class="item-meta">'+esc([item.sub,item.district].filter(Boolean).join(' \u00b7 '))+'</span>';
-    btn.addEventListener('click', ()=>flyToVillage(item));
+    btn.className = 'list-item-btn v-item';
+    btn.innerHTML = '<span class="dot"></span>'
+      +'<span class="item-text">'
+      +'<span class="item-name">'+esc(item.name)+'</span>'
+      +'<span class="item-meta">'+esc([item.sub,item.district].filter(Boolean).join(' · '))+'</span>'
+      +'</span>';
+    btn.addEventListener('click', ()=>flyToVillage(item, btn));
     li.appendChild(btn);
     frag.appendChild(li);
   });
@@ -455,14 +542,16 @@ function buildDistrictList(){
   const frag = document.createDocumentFragment();
   districtData.forEach(item=>{
     const li  = document.createElement('li');
+    li.dataset.name = item.name;
     const btn = document.createElement('button');
+    btn.className = 'list-item-btn';
     btn.dataset.name = item.name;
-    btn.innerHTML = '<span class="item-name">'+esc(item.name)+'</span>'
-      +'<span class="item-meta">District \u00b7 Assam</span>';
-    btn.addEventListener('click', ()=>{
-      if(currentTab !== 'districts') switchTab('districts');
-      selectDistrict(item.name, true);
-    });
+    btn.innerHTML = '<span class="dot"></span>'
+      +'<span class="item-text">'
+      +'<span class="item-name">'+esc(item.name)+'</span>'
+      +'<span class="item-meta">District · Assam</span>'
+      +'</span>';
+    btn.addEventListener('click', ()=>selectDistrict(item.name, true, btn));
     li.appendChild(btn);
     frag.appendChild(li);
   });
@@ -470,45 +559,103 @@ function buildDistrictList(){
   renderDistrictList('');
 }
 
-// ── SEARCH / FILTER ───────────────────────────────────────────
-function renderVillageList(term){
-  const q = term.toLowerCase().trim();
-  let shown = 0;
-  villageList.querySelectorAll('li').forEach((li,i)=>{
-    const item = villageData[i];
-    if(!item){ li.hidden=true; return; }
-    const match = !q
-      || item.name.toLowerCase().includes(q)
-      || item.sub.toLowerCase().includes(q)
-      || item.district.toLowerCase().includes(q);
-    li.hidden = !match;
-    if(match) shown++;
-  });
-  searchCount.textContent = q
-    ? shown.toLocaleString()+' of '+villageData.length.toLocaleString()+' villages'
-    : villageData.length.toLocaleString()+' villages';
+// ── NAVIGATION ────────────────────────────────────────────
+let activeVBtn = null;
+let activeDBtn = null;
+
+function flyToVillage(item, btn){
+  // Switch to map view on mobile
+  if(isMobile()) document.getElementById('show-map-btn').click();
+
+  if(activeVBtn) activeVBtn.classList.remove('highlighted');
+  activeVBtn = btn;
+  btn.classList.add('highlighted');
+
+  map.setView([item.lat, item.lng], 15, {animate:true});
+  setTimeout(()=>item.marker.openPopup(), 350);
 }
 
-function renderDistrictList(term){
-  const q = term.toLowerCase().trim();
-  let shown = 0;
-  districtList.querySelectorAll('li').forEach(li=>{
-    const name = (li.querySelector('button')||{}).dataset?.name||'';
-    const match = !q || name.toLowerCase().includes(q);
-    li.hidden = !match;
-    if(match) shown++;
-  });
-  searchCount.textContent = q
-    ? shown+' of '+districtData.length+' districts'
-    : districtData.length+' districts';
+function selectDistrict(name, zoom, btn){
+  if(isMobile()) document.getElementById('show-map-btn').click();
+
+  // reset old highlight
+  if(activeDistName){
+    const prev = districtData.find(d=>d.name===activeDistName);
+    if(prev) prev.layer.setStyle(dStyle);
+  }
+  if(activeDBtn) activeDBtn.classList.remove('highlighted');
+  activeDistName = name;
+  activeDBtn = btn;
+  if(btn) btn.classList.add('highlighted');
+
+  const item = districtData.find(d=>d.name===name);
+  if(!item) return;
+  item.layer.setStyle(dHiStyle);
+  if(zoom){ map.fitBounds(item.bounds,{padding:[40,40],maxZoom:11}); item.layer.openPopup(); }
+  districtList.querySelectorAll('button[data-name]').forEach(b=>b.classList.toggle('highlighted', b.dataset.name===name));
 }
 
-searchInput.addEventListener('input', e=>{
-  if(currentTab==='villages') renderVillageList(e.target.value);
-  else renderDistrictList(e.target.value);
-});
+// ── LOAD DISTRICTS ────────────────────────────────────────
+function loadDistricts(){
+  setStatus('Loading districts…');
+  fetch('../districts-simple.geojson')
+    .then(r=>{ if(!r.ok) throw new Error('District data failed'); return r.json(); })
+    .then(data=>{
+      districtGeoLayer = L.geoJSON(data, {
+        style: dStyle,
+        onEachFeature(feature, layer){
+          const name = feature.properties.name;
+          layer.bindPopup(districtPopup(name),{maxWidth:220});
+          layer.on({
+            mouseover(){ if(activeDistName!==name) layer.setStyle(dHiStyle); },
+            mouseout() { if(activeDistName!==name) layer.setStyle(dStyle); },
+            click(e)   {
+              const btn = districtList.querySelector('button[data-name="'+name+'"]');
+              selectDistrict(name, false, btn);
+            },
+          });
+          districtData.push({name, layer, bounds:layer.getBounds()});
+        }
+      });
+      districtData.sort((a,b)=>a.name.localeCompare(b.name));
+      dCount.textContent = districtData.length;
+      buildDistrictList();
+      setStatus('Districts loaded. Loading villages…');
+      loadVillages();
+    })
+    .catch(err=>setStatus('Error: '+err.message));
+}
 
-// ── BOOT ──────────────────────────────────────────────────────
+// ── LOAD VILLAGES ─────────────────────────────────────────
+function loadVillages(){
+  fetch('villages-slim.json')
+    .then(r=>{ if(!r.ok) throw new Error('Village data failed'); return r.json(); })
+    .then(rows=>{
+      villageCluster = L.markerClusterGroup({
+        chunkedLoading:true, chunkInterval:150, chunkDelay:30,
+        maxClusterRadius:60, showCoverageOnHover:false,
+      });
+      rows.forEach(([name,sub,district,lat,lng])=>{
+        const marker = L.circleMarker([lat,lng],{
+          radius:5, color:'#a03800', weight:1, fillColor:'#e06020', fillOpacity:.9,
+        });
+        marker.bindPopup(villagePopup(name,sub,district,lat,lng),{maxWidth:220});
+        villageCluster.addLayer(marker);
+        villageData.push({name,sub,district,lat,lng,marker});
+      });
+      // Village tab is default, add to map now
+      if(currentTab==='v') villageCluster.addTo(map);
+
+      villageData.sort((a,b)=>a.name.localeCompare(b.name));
+      buildVillageList();
+      vCount.textContent = villageData.length.toLocaleString();
+      setStatus(villageData.length.toLocaleString()+' villages ready', true);
+      renderVillageList('');
+    })
+    .catch(err=>setStatus('Error: '+err.message, true));
+}
+
+// ── BOOT ──────────────────────────────────────────────────
 loadDistricts();
 </script>
 </body>
