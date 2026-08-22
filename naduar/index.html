@@ -15,34 +15,61 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     
-    .header { height: 56px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 18px; flex-shrink: 0; z-index: 500; }
-    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.02rem; color: #f8fafc; text-decoration: none; }
-    .brand-badge { background: #0284c7; color: #fff; font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; font-weight: 700; }
-    .nav-actions { display: flex; align-items: center; gap: 10px; }
-    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; text-decoration: none; cursor: pointer; border: 1px solid var(--border); transition: all 0.15s; }
+    .header { height: 56px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; flex-shrink: 0; z-index: 500; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1rem; color: #f8fafc; text-decoration: none; }
+    .brand-badge { background: #0284c7; color: #fff; font-size: 0.7rem; padding: 3px 7px; border-radius: 6px; text-transform: uppercase; font-weight: 700; }
+    .nav-actions { display: flex; align-items: center; gap: 8px; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; text-decoration: none; cursor: pointer; border: 1px solid var(--border); transition: all 0.15s; }
     .btn-primary { background: #0284c7; color: #fff; border-color: #0369a1; }
     .btn-primary:hover { background: #0369a1; }
     .btn-secondary { background: rgba(255,255,255,0.06); color: #e2e8f0; }
     .btn-secondary:hover { background: rgba(255,255,255,0.12); }
     
-    .layout { flex: 1; display: grid; grid-template-columns: 380px 1fr; min-height: 0; }
-    @media(max-width: 768px) { .layout { display: flex; flex-direction: column; } }
+    /* Mobile View Toggle */
+    .view-toggle { display: none; gap: 2px; background: rgba(15, 23, 42, 0.6); padding: 3px; border-radius: 8px; border: 1px solid var(--border); }
+    .view-btn { padding: 5px 10px; font-size: 0.76rem; font-weight: 700; background: transparent; border: none; color: var(--muted); cursor: pointer; border-radius: 6px; transition: all 0.15s; }
+    .view-btn.active { background: var(--accent); color: #fff; }
     
+    .layout { flex: 1; display: grid; grid-template-columns: 360px 1fr; min-height: 0; }
     .sidebar { background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
-    .search-box { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .search-box { padding: 10px 12px; border-bottom: 1px solid var(--border); }
     .search-input { width: 100%; padding: 8px 12px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; color: #fff; font: inherit; font-size: 0.85rem; outline: none; }
     .search-input:focus { border-color: var(--accent); }
     
     .village-list { flex: 1; overflow-y: auto; list-style: none; }
-    .village-item { padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
+    .village-item { padding: 11px 13px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
     .village-item:hover { background: rgba(255,255,255,0.04); }
     .village-item.active { background: rgba(56, 189, 248, 0.12); border-left: 3.5px solid var(--accent); }
-    .v-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-    .v-name { font-weight: 700; font-size: 0.9rem; color: #f8fafc; }
+    .v-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+    .v-name { font-weight: 700; font-size: 0.88rem; color: #f8fafc; }
     .v-chip { font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 12px; }
-    .v-meta { font-size: 0.76rem; color: var(--muted); }
+    .v-meta { font-size: 0.74rem; color: var(--muted); }
     
+    main { position: relative; width: 100%; height: 100%; min-height: 0; }
     #map { width: 100%; height: 100%; background: #090d16; }
+    
+    /* Responsive Mobile Rules */
+    @media(max-width: 768px) {
+      .view-toggle { display: flex; }
+      .header { padding: 0 10px; }
+      .brand-badge { display: none; }
+      .brand { font-size: 0.88rem; }
+      .btn { padding: 5px 8px; font-size: 0.74rem; }
+      
+      .layout { display: flex; flex-direction: column; height: calc(100vh - 56px); }
+      .sidebar { height: 100%; flex: 1; border-right: none; }
+      main { height: 100%; flex: 1; }
+      
+      /* Mobile View Modes */
+      .layout.mobile-map-view .sidebar { display: none !important; }
+      .layout.mobile-map-view main { display: block !important; height: 100% !important; flex: 1 !important; }
+      
+      .layout.mobile-list-view main { display: none !important; }
+      .layout.mobile-list-view .sidebar { display: flex !important; height: 100% !important; flex: 1 !important; }
+      
+      .layout.mobile-split-view main { display: block !important; height: 55% !important; flex: none !important; }
+      .layout.mobile-split-view .sidebar { display: flex !important; height: 45% !important; flex: none !important; border-top: 1px solid var(--border); }
+    }
     
     .leaflet-popup-content-wrapper { background: #1e293b; color: #f8fafc; border-radius: 10px; border: 1px solid var(--border); }
     .leaflet-popup-tip { background: #1e293b; }
@@ -69,16 +96,21 @@
 
 <header class="header">
   <a class="brand" href="../assam/">
-    📍 Ranga Chakua & Chari Pukhuri Cluster
+    📍 Ranga Chakua & Chari Pukhuri
     <span class="brand-badge">Na-Duar, Sonitpur</span>
   </a>
+  <div class="view-toggle" role="group" aria-label="Toggle view">
+    <button class="view-btn active" id="show-map-btn">🗺️ Map</button>
+    <button class="view-btn" id="show-list-btn">📋 List</button>
+    <button class="view-btn" id="show-split-btn">📱 Both</button>
+  </div>
   <div class="nav-actions">
-    <a class="btn btn-secondary" href="../assam/">🗺️ Main Assam Portal</a>
-    <a class="btn btn-primary" href="naduar_villages.kml" download="Na_Duar_Sub_District_Villages.kml">📥 Na-Duar KML File</a>
+    <a class="btn btn-secondary" href="../assam/">🗺️ Assam Portal</a>
+    <a class="btn btn-primary" href="naduar_villages.kml" download="Na_Duar_Sub_District_Villages.kml">📥 KML</a>
   </div>
 </header>
 
-<div class="layout">
+<div class="layout mobile-map-view">
   <aside class="sidebar">
     <div class="search-box">
       <input id="q" class="search-input" type="search" placeholder="Search cluster villages..." autocomplete="off" />
@@ -86,17 +118,13 @@
     <ul class="village-list" id="v-list"></ul>
   </aside>
   
-  <main style="position:relative;">
+  <main>
     <div id="map"></div>
   </main>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="cluster_geojson.js?v=20260820_v420260820_v320260820_v2"></script>
-<script>
-const clusterDataInline = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"id": 14783, "name": "Ranga Chakua", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.832, "lng": 92.919, "contact": "Core Village (Ranga Chakua)", "color": "#f43f5e"}, "geometry": {"type": "Polygon", "coordinates": [[[92.922, 26.844], [92.921, 26.844], [92.92, 26.844], [92.919, 26.845], [92.918, 26.845], [92.918, 26.846], [92.917, 26.845], [92.916, 26.845], [92.915, 26.846], [92.915, 26.845], [92.914, 26.844], [92.913, 26.843], [92.912, 26.842], [92.911, 26.841], [92.909, 26.839], [92.907, 26.834], [92.906, 26.831], [92.906, 26.83], [92.906, 26.829], [92.907, 26.827], [92.908, 26.827], [92.909, 26.826], [92.911, 26.825], [92.912, 26.825], [92.914, 26.824], [92.917, 26.824], [92.918, 26.823], [92.919, 26.822], [92.92, 26.821], [92.922, 26.819], [92.922, 26.817], [92.923, 26.816], [92.924, 26.815], [92.925, 26.813], [92.926, 26.813], [92.926, 26.814], [92.926, 26.815], [92.926, 26.817], [92.926, 26.819], [92.926, 26.821], [92.926, 26.823], [92.926, 26.825], [92.926, 26.827], [92.926, 26.829], [92.926, 26.831], [92.926, 26.833], [92.926, 26.834], [92.926, 26.836], [92.926, 26.837], [92.926, 26.838], [92.927, 26.84], [92.926, 26.842], [92.926, 26.843], [92.925, 26.844], [92.924, 26.844], [92.923, 26.843], [92.922, 26.844]]]}}, {"type": "Feature", "properties": {"id": 14782, "name": "Chari Pukhuri", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.837, "lng": 92.901, "contact": "Core Village (Chari Pukhuri)", "color": "#06b6d4"}, "geometry": {"type": "Polygon", "coordinates": [[[92.911, 26.841], [92.911, 26.843], [92.91, 26.845], [92.91, 26.846], [92.908, 26.846], [92.906, 26.846], [92.904, 26.846], [92.902, 26.845], [92.899, 26.846], [92.898, 26.846], [92.898, 26.844], [92.897, 26.843], [92.897, 26.841], [92.896, 26.839], [92.896, 26.838], [92.896, 26.836], [92.895, 26.834], [92.895, 26.833], [92.894, 26.832], [92.894, 26.831], [92.894, 26.83], [92.894, 26.829], [92.895, 26.829], [92.897, 26.829], [92.899, 26.829], [92.902, 26.829], [92.903, 26.829], [92.904, 26.829], [92.905, 26.83], [92.906, 26.83], [92.906, 26.831], [92.907, 26.834], [92.909, 26.839], [92.911, 26.841]]]}}, {"type": "Feature", "properties": {"id": 15341, "name": "Morisuti", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.864, "lng": 92.907, "contact": "Direct border w/ No.1 Batamari & Block #14737", "color": "#a855f7"}, "geometry": {"type": "Polygon", "coordinates": [[[92.914, 26.879], [92.904, 26.879], [92.902, 26.876], [92.901, 26.875], [92.9, 26.875], [92.899, 26.874], [92.898, 26.873], [92.897, 26.872], [92.895, 26.87], [92.894, 26.869], [92.893, 26.867], [92.892, 26.867], [92.892, 26.866], [92.892, 26.865], [92.893, 26.865], [92.894, 26.865], [92.895, 26.865], [92.896, 26.865], [92.897, 26.865], [92.897, 26.864], [92.897, 26.862], [92.897, 26.861], [92.897, 26.86], [92.898, 26.86], [92.898, 26.859], [92.898, 26.858], [92.899, 26.857], [92.899, 26.856], [92.9, 26.855], [92.901, 26.855], [92.903, 26.855], [92.904, 26.856], [92.905, 26.856], [92.907, 26.855], [92.908, 26.855], [92.909, 26.854], [92.91, 26.854], [92.911, 26.854], [92.912, 26.854], [92.913, 26.854], [92.913, 26.855], [92.914, 26.855], [92.915, 26.855], [92.916, 26.856], [92.917, 26.856], [92.918, 26.857], [92.919, 26.857], [92.919, 26.858], [92.919, 26.859], [92.918, 26.86], [92.918, 26.861], [92.917, 26.863], [92.917, 26.864], [92.917, 26.865], [92.918, 26.866], [92.919, 26.867], [92.919, 26.868], [92.919, 26.869], [92.919, 26.87], [92.918, 26.872], [92.917, 26.873], [92.916, 26.874], [92.916, 26.875], [92.916, 26.876], [92.915, 26.877], [92.914, 26.879]]]}}, {"type": "Feature", "properties": {"id": 14788, "name": "No.1 Batamari", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.851, "lng": 92.919, "contact": "Extensive (14 pts w/ Ranga Chakua, 12 pts w/ Morisuti)", "color": "#8b5cf6"}, "geometry": {"type": "Polygon", "coordinates": [[[92.929, 26.858], [92.927, 26.858], [92.925, 26.857], [92.923, 26.858], [92.92, 26.858], [92.919, 26.858], [92.919, 26.857], [92.918, 26.857], [92.917, 26.856], [92.916, 26.856], [92.915, 26.855], [92.914, 26.855], [92.913, 26.855], [92.913, 26.854], [92.912, 26.854], [92.911, 26.854], [92.91, 26.854], [92.91, 26.853], [92.91, 26.851], [92.91, 26.85], [92.91, 26.848], [92.91, 26.846], [92.91, 26.845], [92.911, 26.843], [92.911, 26.841], [92.912, 26.842], [92.913, 26.843], [92.914, 26.844], [92.915, 26.845], [92.915, 26.846], [92.916, 26.845], [92.917, 26.845], [92.918, 26.846], [92.918, 26.845], [92.919, 26.845], [92.92, 26.844], [92.921, 26.844], [92.922, 26.844], [92.923, 26.844], [92.924, 26.845], [92.924, 26.847], [92.925, 26.848], [92.924, 26.849], [92.924, 26.85], [92.925, 26.852], [92.925, 26.853], [92.926, 26.854], [92.927, 26.855], [92.928, 26.855], [92.928, 26.856], [92.929, 26.857], [92.929, 26.858]]]}}, {"type": "Feature", "properties": {"id": 14789, "name": "No.2 Batamari", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.846, "lng": 92.93, "contact": "Major (10 shared points w/ Ranga Chakua)", "color": "#eab308"}, "geometry": {"type": "Polygon", "coordinates": [[[92.935, 26.838], [92.935, 26.839], [92.935, 26.84], [92.935, 26.841], [92.935, 26.842], [92.935, 26.843], [92.935, 26.844], [92.934, 26.845], [92.934, 26.846], [92.935, 26.847], [92.936, 26.848], [92.936, 26.849], [92.936, 26.85], [92.936, 26.851], [92.935, 26.852], [92.935, 26.853], [92.934, 26.854], [92.934, 26.855], [92.933, 26.855], [92.932, 26.855], [92.931, 26.855], [92.93, 26.855], [92.93, 26.858], [92.929, 26.858], [92.929, 26.857], [92.928, 26.856], [92.928, 26.855], [92.927, 26.855], [92.926, 26.854], [92.925, 26.853], [92.925, 26.852], [92.924, 26.85], [92.924, 26.849], [92.925, 26.848], [92.924, 26.847], [92.924, 26.845], [92.923, 26.844], [92.922, 26.844], [92.923, 26.843], [92.924, 26.844], [92.925, 26.844], [92.926, 26.843], [92.926, 26.842], [92.927, 26.84], [92.926, 26.838], [92.926, 26.837], [92.926, 26.836], [92.927, 26.836], [92.928, 26.836], [92.929, 26.836], [92.93, 26.836], [92.931, 26.836], [92.932, 26.836], [92.933, 26.837], [92.934, 26.837], [92.934, 26.838], [92.935, 26.838]]]}}, {"type": "Feature", "properties": {"id": 14331, "name": "Hatinga Gaon", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.819, "lng": 92.937, "contact": "Major (10 shared points w/ Ranga Chakua)", "color": "#ec4899"}, "geometry": {"type": "Polygon", "coordinates": [[[92.94, 26.827], [92.939, 26.827], [92.938, 26.827], [92.936, 26.827], [92.933, 26.827], [92.929, 26.827], [92.927, 26.827], [92.926, 26.827], [92.926, 26.825], [92.926, 26.823], [92.926, 26.821], [92.926, 26.819], [92.926, 26.817], [92.926, 26.815], [92.926, 26.814], [92.926, 26.813], [92.925, 26.813], [92.925, 26.812], [92.927, 26.812], [92.928, 26.812], [92.93, 26.812], [92.932, 26.812], [92.935, 26.811], [92.937, 26.811], [92.939, 26.811], [92.941, 26.811], [92.944, 26.811], [92.944, 26.812], [92.945, 26.813], [92.946, 26.813], [92.946, 26.814], [92.946, 26.815], [92.946, 26.816], [92.946, 26.817], [92.946, 26.818], [92.947, 26.819], [92.947, 26.82], [92.947, 26.821], [92.946, 26.822], [92.945, 26.822], [92.944, 26.822], [92.943, 26.822], [92.942, 26.822], [92.941, 26.821], [92.94, 26.821], [92.94, 26.822], [92.939, 26.822], [92.939, 26.823], [92.94, 26.824], [92.94, 26.825], [92.94, 26.826], [92.94, 26.827]]]}}, {"type": "Feature", "properties": {"id": 14692, "name": "Rampur Hatinga", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.833, "lng": 92.934, "contact": "Direct border (6 shared points w/ Ranga Chakua)", "color": "#f97316"}, "geometry": {"type": "Polygon", "coordinates": [[[92.94, 26.836], [92.939, 26.836], [92.938, 26.836], [92.937, 26.836], [92.936, 26.836], [92.935, 26.836], [92.935, 26.837], [92.935, 26.838], [92.934, 26.838], [92.934, 26.837], [92.933, 26.837], [92.932, 26.836], [92.931, 26.836], [92.93, 26.836], [92.929, 26.836], [92.928, 26.836], [92.927, 26.836], [92.926, 26.836], [92.926, 26.834], [92.926, 26.833], [92.926, 26.831], [92.926, 26.829], [92.926, 26.827], [92.927, 26.827], [92.929, 26.827], [92.933, 26.827], [92.936, 26.827], [92.938, 26.827], [92.939, 26.827], [92.94, 26.827], [92.94, 26.828], [92.94, 26.831], [92.94, 26.833], [92.94, 26.834], [92.94, 26.835], [92.94, 26.836]]]}}, {"type": "Feature", "properties": {"id": 14784, "name": "Gorbil", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.839, "lng": 92.89, "contact": "Extensive (11 shared points w/ Chari Pukhuri)", "color": "#10b981"}, "geometry": {"type": "Polygon", "coordinates": [[[92.898, 26.846], [92.897, 26.847], [92.896, 26.847], [92.895, 26.848], [92.894, 26.848], [92.893, 26.848], [92.892, 26.848], [92.891, 26.848], [92.89, 26.847], [92.889, 26.845], [92.888, 26.845], [92.887, 26.844], [92.886, 26.844], [92.885, 26.844], [92.883, 26.843], [92.882, 26.843], [92.881, 26.84], [92.881, 26.837], [92.88, 26.835], [92.879, 26.832], [92.88, 26.832], [92.881, 26.832], [92.882, 26.832], [92.883, 26.832], [92.884, 26.832], [92.885, 26.832], [92.885, 26.831], [92.886, 26.831], [92.887, 26.831], [92.888, 26.831], [92.89, 26.832], [92.891, 26.832], [92.892, 26.832], [92.893, 26.831], [92.894, 26.831], [92.894, 26.832], [92.895, 26.833], [92.895, 26.834], [92.896, 26.836], [92.896, 26.838], [92.896, 26.839], [92.897, 26.841], [92.897, 26.843], [92.898, 26.844], [92.898, 26.846]]]}}, {"type": "Feature", "properties": {"id": 14330, "name": "Agripam", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.824, "lng": 92.899, "contact": "Major (9 pts w/ Chari Pukhuri, 4 pts w/ Ranga Chakua)", "color": "#84cc16"}, "geometry": {"type": "Polygon", "coordinates": [[[92.908, 26.827], [92.907, 26.827], [92.906, 26.829], [92.906, 26.83], [92.905, 26.83], [92.904, 26.829], [92.903, 26.829], [92.902, 26.829], [92.899, 26.829], [92.897, 26.829], [92.895, 26.829], [92.894, 26.829], [92.894, 26.828], [92.894, 26.827], [92.894, 26.826], [92.895, 26.825], [92.895, 26.824], [92.895, 26.823], [92.895, 26.822], [92.895, 26.821], [92.895, 26.82], [92.895, 26.819], [92.894, 26.818], [92.894, 26.817], [92.894, 26.816], [92.895, 26.817], [92.896, 26.818], [92.897, 26.819], [92.899, 26.82], [92.899, 26.821], [92.901, 26.822], [92.903, 26.823], [92.905, 26.823], [92.905, 26.824], [92.906, 26.825], [92.907, 26.827], [92.908, 26.827]]]}}, {"type": "Feature", "properties": {"id": 14254, "name": "Bamun Gaon", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.825, "lng": 92.886, "contact": "Touchpoint (3 shared points w/ Chari Pukhuri)", "color": "#3b82f6"}, "geometry": {"type": "Polygon", "coordinates": [[[92.894, 26.831], [92.893, 26.831], [92.892, 26.832], [92.891, 26.832], [92.89, 26.832], [92.888, 26.831], [92.887, 26.831], [92.886, 26.831], [92.885, 26.831], [92.885, 26.832], [92.884, 26.832], [92.883, 26.832], [92.882, 26.832], [92.881, 26.832], [92.88, 26.832], [92.879, 26.832], [92.879, 26.831], [92.879, 26.83], [92.879, 26.829], [92.878, 26.828], [92.878, 26.827], [92.878, 26.826], [92.877, 26.824], [92.877, 26.823], [92.877, 26.822], [92.877, 26.821], [92.876, 26.82], [92.876, 26.817], [92.877, 26.817], [92.878, 26.817], [92.881, 26.817], [92.883, 26.817], [92.887, 26.817], [92.888, 26.817], [92.89, 26.817], [92.892, 26.817], [92.894, 26.817], [92.894, 26.818], [92.895, 26.819], [92.895, 26.82], [92.895, 26.821], [92.895, 26.822], [92.895, 26.823], [92.895, 26.824], [92.895, 26.825], [92.894, 26.826], [92.894, 26.827], [92.894, 26.828], [92.894, 26.829], [92.894, 26.83], [92.894, 26.831]]]}}, {"type": "Feature", "properties": {"id": 14737, "name": "Block #14737", "sub": "Na-Duar", "district": "SONITPUR", "lat": 26.852, "lng": 92.9, "contact": "Direct border (12 pts w/ Morisuti, 7 pts w/ Chari Pukhuri)", "color": "#64748b"}, "geometry": {"type": "Polygon", "coordinates": [[[92.898, 26.858], [92.896, 26.859], [92.894, 26.859], [92.893, 26.858], [92.892, 26.858], [92.891, 26.857], [92.89, 26.852], [92.891, 26.85], [92.891, 26.849], [92.892, 26.849], [92.893, 26.848], [92.894, 26.848], [92.895, 26.848], [92.896, 26.847], [92.897, 26.847], [92.898, 26.846], [92.899, 26.846], [92.902, 26.845], [92.904, 26.846], [92.906, 26.846], [92.908, 26.846], [92.91, 26.846], [92.91, 26.848], [92.91, 26.85], [92.91, 26.851], [92.91, 26.853], [92.91, 26.854], [92.909, 26.854], [92.908, 26.855], [92.907, 26.855], [92.905, 26.856], [92.904, 26.856], [92.903, 26.855], [92.901, 26.855], [92.9, 26.855], [92.899, 26.856], [92.899, 26.857], [92.898, 26.858]]]}}]};
-if (typeof clusterData === "undefined") { var clusterData = clusterDataInline; }
-</script>
+<script src="cluster_geojson.js?v=20260820_v5"></script>
 <script>
   const map = L.map('map', {
     zoomControl: false,
@@ -156,6 +184,40 @@ if (typeof clusterData === "undefined") { var clusterData = clusterDataInline; }
 
   map.fitBounds(geoLayer.getBounds(), { padding: [40, 40] });
 
+  // MOBILE VIEW TOGGLE LOGIC
+  const layout = document.querySelector('.layout');
+  const btnMap = document.getElementById('show-map-btn');
+  const btnList = document.getElementById('show-list-btn');
+  const btnSplit = document.getElementById('show-split-btn');
+
+  function setMobileView(mode) {
+    layout.classList.remove('mobile-map-view', 'mobile-list-view', 'mobile-split-view');
+    btnMap.classList.remove('active');
+    btnList.classList.remove('active');
+    btnSplit.classList.remove('active');
+    
+    if (mode === 'map') {
+      layout.classList.add('mobile-map-view');
+      btnMap.classList.add('active');
+    } else if (mode === 'list') {
+      layout.classList.add('mobile-list-view');
+      btnList.classList.add('active');
+    } else {
+      layout.classList.add('mobile-split-view');
+      btnSplit.classList.add('active');
+    }
+    
+    setTimeout(() => { map.invalidateSize(); }, 120);
+  }
+
+  btnMap.addEventListener('click', () => setMobileView('map'));
+  btnList.addEventListener('click', () => setMobileView('list'));
+  btnSplit.addEventListener('click', () => setMobileView('split'));
+
+  if (window.innerWidth <= 768) {
+    setMobileView('map');
+  }
+
   const vList = document.getElementById('v-list');
   const qInput = document.getElementById('q');
 
@@ -176,6 +238,10 @@ if (typeof clusterData === "undefined") { var clusterData = clusterDataInline; }
         document.querySelectorAll('.village-item').forEach(el => el.classList.remove('active'));
         li.classList.add('active');
         
+        if (window.innerWidth <= 768 && layout.classList.contains('mobile-list-view')) {
+          setMobileView('map');
+        }
+        
         const layer = layerMap.get(p.id);
         if (layer) {
           map.fitBounds(layer.getBounds(), { padding: [50, 50], maxZoom: 15, animate: true });
@@ -189,6 +255,10 @@ if (typeof clusterData === "undefined") { var clusterData = clusterDataInline; }
 
   qInput.addEventListener('input', e => renderList(e.target.value));
   renderList();
+  
+  window.addEventListener('resize', () => {
+    map.invalidateSize();
+  });
 </script>
 </body>
 </html>

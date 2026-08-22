@@ -207,8 +207,8 @@
     </div>
     <span id="search-count" aria-live="polite"></span>
     <div class="view-toggle" role="group" aria-label="Toggle view">
-      <button class="view-btn" id="show-map-btn">Map</button>
-      <button class="view-btn active" id="show-list-btn">List</button>
+      <button class="view-btn active" id="show-map-btn">Map</button>
+      <button class="view-btn" id="show-list-btn">List</button>
     </div>
   </div>
 </div>
@@ -216,7 +216,7 @@
 <!-- main split: list left, map right -->
 <main class="portal">
 
-  <div class="list-pane" id="list-pane">
+  <div class="list-pane mobile-hidden" id="list-pane">
     <div class="list-scroll" id="panel-v" role="tabpanel" aria-labelledby="tab-v">
       <ul class="list-ul" id="village-list" aria-label="Village list">
         <li class="empty-state"><div class="big">⏳</div><p>Loading villages…</p></li>
@@ -231,7 +231,7 @@
     </div>
   </div>
 
-  <div id="map-pane" class="mobile-hidden">
+  <div id="map-pane">
     <div id="map"></div>
   </div>
 
@@ -312,7 +312,7 @@ let districtData        = [];   // [{name, geojson}]
 let villageData         = [];   // [{id, name, sub, district, lat, lng, _searchKey}]
 let filteredVillages    = [];
 let villageDisplayCount = 80;
-let mobilePanelShown    = 'list';
+let mobilePanelShown    = 'map';
 let activeVLayer        = null; // single village polygon or marker layer
 let activeDLayer        = null; // single district polygon layer
 
